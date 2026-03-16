@@ -1,7 +1,10 @@
 {
-	"name": "json-url",
+	"name": "@firstform/json-url",
 	"version": "4.0.0",
 	"description": "Compress JSON into compact base64 URI-friendly notation",
+	"publishConfig": {
+		"access": "public"
+	},
 	"type": "module",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",

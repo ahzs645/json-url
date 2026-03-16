@@ -147,7 +147,7 @@ async function encodeCompressedValue(
 	}
 
 	const safe64 = await CORE_LOADERS.safe64();
-	return safe64.encode(typeof value === 'string' ? Buffer.from(value, 'utf8') : value);
+	return safe64.encode(typeof value === 'string' ? Buffer.from(value, 'utf8') : Buffer.from(value));
 }
 
 async function decodeCompressedValue(

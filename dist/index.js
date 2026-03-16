@@ -60,7 +60,7 @@ async function h(e, t) {
 	return t.pack ? (await n.msgpack()).decode(i.from(e)) : JSON.parse(String(e));
 }
 async function g(e, t) {
-	return t.encode ? (await n.safe64()).encode(typeof e == "string" ? i.from(e, "utf8") : e) : typeof e == "string" ? e : i.from(e).toString("utf8");
+	return t.encode ? (await n.safe64()).encode(typeof e == "string" ? i.from(e, "utf8") : i.from(e)) : typeof e == "string" ? e : i.from(e).toString("utf8");
 }
 async function _(e, t) {
 	return t.encode ? (await n.safe64()).decode(e) : e;
