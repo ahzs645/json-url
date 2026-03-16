@@ -34,6 +34,7 @@ var _default = exports["default"] = {
   },
   safe64: function safe64() {
     return (0, _asyncToGenerator2["default"])(/*#__PURE__*/_regenerator["default"].mark(function _callee2() {
+      var module;
       return _regenerator["default"].wrap(function (_context2) {
         while (1) switch (_context2.prev = _context2.next) {
           case 0:
@@ -42,7 +43,8 @@ var _default = exports["default"] = {
               return _interopRequireWildcard(require(/* webpackChunkName: "safe64" */'urlsafe-base64'));
             });
           case 1:
-            return _context2.abrupt("return", _context2.sent);
+            module = _context2.sent;
+            return _context2.abrupt("return", module["default"] || module);
           case 2:
           case "end":
             return _context2.stop();
@@ -72,6 +74,7 @@ var _default = exports["default"] = {
   },
   lzstring: function lzstring() {
     return (0, _asyncToGenerator2["default"])(/*#__PURE__*/_regenerator["default"].mark(function _callee4() {
+      var module;
       return _regenerator["default"].wrap(function (_context4) {
         while (1) switch (_context4.prev = _context4.next) {
           case 0:
@@ -80,7 +83,8 @@ var _default = exports["default"] = {
               return _interopRequireWildcard(require(/* webpackChunkName: "lzstring" */'lz-string'));
             });
           case 1:
-            return _context4.abrupt("return", _context4.sent);
+            module = _context4.sent;
+            return _context4.abrupt("return", module["default"] || module);
           case 2:
           case "end":
             return _context4.stop();

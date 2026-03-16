@@ -1,4 +1,5 @@
 import ALGORITHMS from 'main/codecs';
+import { prepareEncodedInput } from 'main/decode-utils';
 import LOADERS from 'main/loaders';
 import { createUnsupportedCodecError } from 'main/codecs/stream-codec';
 
@@ -211,11 +212,20 @@ export function createNamedCodec(algorithm, options = {}) {
 		return encodeCompressedValue(compressed, config);
 	}
 
-	async function decompress(string) {
-		const decoded = await decodeCompressedValue(string, config);
+	async function decompress(string, options = {}) {
+		const normalized = prepareEncodedInput(string, options);
+		const decoded = await decodeCompressedValue(normalized, config);
 		const decompressed = await config.decompress(decoded);
 		const unpacked = await deserializeValue(decompressed, config);
 		return applyTransforms(unpacked, transforms, 'decode');
+	}
+
+	async function tryDecompress(string, fallback, options = {}) {
+		try {
+			return await decompress(string, options);
+		} catch {
+			return fallback;
+		}
 	}
 
 	async function stats(json) {
@@ -239,6 +249,7 @@ export function createNamedCodec(algorithm, options = {}) {
 		id,
 		compress,
 		decompress,
+		tryDecompress,
 		stats,
 		transforms: transforms.map((transform) => transform.id)
 	};
@@ -355,8 +366,9 @@ export function createEngine(options = {}) {
 		return result.token;
 	}
 
-	async function decompress(token) {
-		const parsed = parseToken(token);
+	async function decompress(token, options = {}) {
+		const normalized = prepareEncodedInput(token, options);
+		const parsed = parseToken(normalized);
 
 		if (parsed && parsed.version === version && codecMap.has(parsed.codecId)) {
 			const decoded = await codecMap.get(parsed.codecId).client.decompress(parsed.payload);
@@ -374,8 +386,16 @@ export function createEngine(options = {}) {
 			throw new Error('Encoded token is missing a version/codec prefix');
 		}
 
-		const decoded = await codecMap.get(defaultCodec).client.decompress(token);
+		const decoded = await codecMap.get(defaultCodec).client.decompress(normalized);
 		return applyTransforms(decoded, transforms, 'decode');
+	}
+
+	async function tryDecompress(token, fallback, options = {}) {
+		try {
+			return await decompress(token, options);
+		} catch {
+			return fallback;
+		}
 	}
 
 	async function stats(json) {
@@ -391,6 +411,8 @@ export function createEngine(options = {}) {
 		compressBest: compressDetailed,
 		compressDetailed,
 		decompress,
+		tryDecompress,
+		tryDecodeToken: tryDecompress,
 		stats
 	};
 }

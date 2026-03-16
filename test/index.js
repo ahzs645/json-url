@@ -61,6 +61,19 @@ describe('json-url engine', () => {
 		}
 	});
 
+	it('can clean URI-encoded or whitespace-polluted tokens on decode', async () => {
+		const engine = createClient.createWebShareEngine();
+		const sample = {
+			builderName: 'Untitled',
+			builderFields: [{ id: 'q1', type: 'text', label: 'Name' }]
+		};
+		const detailed = await engine.compressDetailed(sample);
+		const dirtyToken = ` \n${encodeURIComponent(detailed.token)} \r`;
+
+		const decoded = await engine.decompress(dirtyToken, { deURI: true });
+		assert.equal(JSON.stringify(decoded), JSON.stringify(sample));
+	});
+
 	it('applies transforms for the single-codec client API', async () => {
 		const codec = createClient('lzstring', {
 			transforms: [
@@ -78,6 +91,13 @@ describe('json-url engine', () => {
 
 		assert.equal(JSON.stringify(decompressed), JSON.stringify(sample));
 		assert.deepEqual(stats.transforms, ['wrap']);
+	});
+
+	it('provides tryDecompress fallbacks for codec clients', async () => {
+		const codec = createClient('raw');
+		const decoded = await codec.tryDecompress('%7Bbad', { fallback: true }, { deURI: true });
+
+		assert.deepEqual(decoded, { fallback: true });
 	});
 
 	it('selects the shortest codec candidate and decodes prefixed tokens', async () => {
@@ -173,5 +193,12 @@ describe('json-url engine', () => {
 			builderName: 'Untitled',
 			builderFields: [{ id: 'q1', type: 'text', label: 'Name' }]
 		}));
+	});
+
+	it('provides tryDecodeToken fallbacks for engine clients', async () => {
+		const engine = createClient.createWebShareEngine();
+		const decoded = await engine.tryDecodeToken('%7Bbad', { fallback: true }, { deURI: true });
+
+		assert.deepEqual(decoded, { fallback: true });
 	});
 });

@@ -24,6 +24,17 @@ Although designed to work in Node, a standalone client-side library is provided 
 	codec.decompress(someCompressedString).then(json => { /* operate on json */ })
 ```
 
+### Try Decompress
+
+If you want a fallback instead of an exception, use `tryDecompress`.
+
+```
+	var codec = require('json-url')('raw');
+	codec.tryDecompress('%7Bbad', { ok: false }, { deURI: true }).then(result => {
+		console.log(result); // { ok: false }
+	});
+```
+
 ### Stats
 
 ```
@@ -104,6 +115,13 @@ When you want to test multiple codecs and keep the shortest token, use `createEn
 	const original = await engine.decompress(token);
 ```
 
+`decompress()` on codecs and engines accepts `{ deURI: true }`, which first removes encoded whitespace and percent-encoding. This is useful when a token has been copied through chat tools or other surfaces that re-encode it.
+
+```
+	const decoded = await engine.decompress('%201.raw.eyJvayI6dHJ1ZX0%20', { deURI: true });
+	const fallback = await engine.tryDecodeToken('%7Bbad', { ok: false }, { deURI: true });
+```
+
 ### Web Share Engine
 
 `createWebShareEngine()` enables the Webforms-style transport defaults:
@@ -169,6 +187,15 @@ To see it in action, download the source code and run `npm run example`, or simp
 	* lz - `compressToEncodedURIComponent` / `decompressFromEncodedURIComponent`
 * `JsonUrl.createEngine()` can test multiple codecs, apply reversible transforms, and emit self-describing `version.codec.payload` tokens.
 * `JsonUrl.createWebShareEngine()` is a preset for `raw/gz/df/br/lz` with `version: "1"` and `maxLength: 12000`.
+* `JsonUrl.cleanEncodedInput()` removes percent-encoding and ignorable whitespace before decode.
+
+## Package Layout
+
+The package now exposes:
+
+* CommonJS via `require('json-url')`
+* ESM via `import JsonUrl from 'json-url'`
+* Browser UMD bundle via `json-url/browser`
 
 ## Motivation
 

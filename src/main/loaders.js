@@ -6,7 +6,8 @@ export default {
 		return factory();
 	},
 	async safe64() {
-		return await import(/* webpackChunkName: "safe64" */ 'urlsafe-base64');
+		const module = await import(/* webpackChunkName: "safe64" */ 'urlsafe-base64');
+		return module.default || module;
 	},
 	async lzma() {
 		const lzma = await import(/* webpackChunkName: "lzma" */ 'lzma');
@@ -15,7 +16,8 @@ export default {
 		return lzma.compress ? lzma : lzma.LZMA;
 	},
 	async lzstring() {
-		return await import(/* webpackChunkName: "lzstring" */ 'lz-string');
+		const module = await import(/* webpackChunkName: "lzstring" */ 'lz-string');
+		return module.default || module;
 	},
 	async lzw() {
 		const module = await import(/* webpackChunkName: "lzw" */ 'node-lzw');

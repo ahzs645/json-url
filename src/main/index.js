@@ -1,3 +1,4 @@
+import { cleanEncodedInput } from 'main/decode-utils';
 import {
 	AVAILABLE_CODECS,
 	DEFAULT_WEB_SHARE_CODECS,
@@ -14,6 +15,7 @@ const createClient = Object.assign(
 	},
 	{
 		availableCodecs: AVAILABLE_CODECS,
+		cleanEncodedInput,
 		defaultWebShareCodecs: DEFAULT_WEB_SHARE_CODECS,
 		defaultWebShareMaxLength: DEFAULT_WEB_SHARE_MAX_LENGTH,
 		defaultWebShareVersion: DEFAULT_WEB_SHARE_VERSION,
