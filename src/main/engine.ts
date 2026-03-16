@@ -2,8 +2,8 @@ import { Buffer } from 'buffer';
 
 import ALGORITHMS from './codecs/index.js';
 import { createUnsupportedCodecError } from './codecs/stream-codec.js';
+import CORE_LOADERS from './core-loaders.js';
 import { prepareEncodedInput } from './decode-utils.js';
-import LOADERS from './loaders.js';
 
 import type {
 	CodecAlgorithmConfig,
@@ -19,6 +19,7 @@ import type {
 	ShareTransform,
 	SkippedCodecStat
 } from './types.js';
+import type { CodecAlgorithmLoader } from './codecs/index.js';
 
 interface NormalizedTransform {
 	id: string;
@@ -115,7 +116,7 @@ async function serializeValue(
 		return JSON.stringify(value);
 	}
 
-	const msgpack = await LOADERS.msgpack();
+	const msgpack = await CORE_LOADERS.msgpack();
 	return msgpack.encode(value);
 }
 
@@ -127,7 +128,7 @@ async function deserializeValue(
 		return JSON.parse(String(value));
 	}
 
-	const msgpack = await LOADERS.msgpack();
+	const msgpack = await CORE_LOADERS.msgpack();
 	return msgpack.decode(Buffer.from(value));
 }
 
@@ -139,7 +140,7 @@ async function encodeCompressedValue(
 		return typeof value === 'string' ? value : Buffer.from(value).toString('utf8');
 	}
 
-	const safe64 = await LOADERS.safe64();
+	const safe64 = await CORE_LOADERS.safe64();
 	return safe64.encode(typeof value === 'string' ? Buffer.from(value, 'utf8') : value);
 }
 
@@ -151,11 +152,13 @@ async function decodeCompressedValue(
 		return value;
 	}
 
-	const safe64 = await LOADERS.safe64();
+	const safe64 = await CORE_LOADERS.safe64();
 	return safe64.decode(value);
 }
 
-function getAlgorithmConfig(algorithm: string): { id: string; config: CodecAlgorithmConfig } {
+function getAlgorithmConfigLoader(
+	algorithm: string
+): { id: string; loadConfig: CodecAlgorithmLoader } {
 	const codecId = normalizeCodecId(algorithm, 'algorithm');
 	if (!Object.prototype.hasOwnProperty.call(ALGORITHMS, codecId)) {
 		throw new Error(`No such algorithm ${codecId}`);
@@ -163,7 +166,7 @@ function getAlgorithmConfig(algorithm: string): { id: string; config: CodecAlgor
 
 	return {
 		id: codecId,
-		config: ALGORITHMS[codecId]
+		loadConfig: ALGORITHMS[codecId]
 	};
 }
 
@@ -262,7 +265,13 @@ export function createNamedCodec<TValue = JsonUrlValue>(
 ): NamedCodecClient<TValue> {
 	const transforms = normalizeTransforms(options.transforms);
 	const transformIds = transforms.map((transform) => transform.id);
-	const { id, config } = getAlgorithmConfig(algorithm);
+	const { id, loadConfig } = getAlgorithmConfigLoader(algorithm);
+	let configPromise: Promise<CodecAlgorithmConfig> | null = null;
+
+	function getConfig(): Promise<CodecAlgorithmConfig> {
+		configPromise ??= loadConfig();
+		return configPromise;
+	}
 
 	async function prepareInput(json: JsonUrlValue) {
 		const transformed = await applyTransforms(json, transforms, 'encode');
@@ -274,6 +283,7 @@ export function createNamedCodec<TValue = JsonUrlValue>(
 
 	async function compress(json: TValue): Promise<string> {
 		const { transformed } = await prepareInput(json);
+		const config = await getConfig();
 		const packed = await serializeValue(transformed, config);
 		const compressed = await config.compress(packed);
 		return encodeCompressedValue(compressed, config);
@@ -281,6 +291,7 @@ export function createNamedCodec<TValue = JsonUrlValue>(
 
 	async function decompress(string: string, options = {}): Promise<TValue> {
 		const normalized = prepareEncodedInput(string, options);
+		const config = await getConfig();
 		const decoded = await decodeCompressedValue(normalized, config);
 		const decompressed = await config.decompress(decoded);
 		const unpacked = await deserializeValue(decompressed, config);

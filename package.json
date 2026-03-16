@@ -16,6 +16,12 @@
 			"require": "./dist/index.cjs",
 			"default": "./dist/index.js"
 		},
+		"./web-share": {
+			"types": "./dist/web-share.d.ts",
+			"import": "./dist/web-share.js",
+			"require": "./dist/web-share.cjs",
+			"default": "./dist/web-share.js"
+		},
 		"./browser": "./dist/browser/json-url-single.js",
 		"./package.json": "./package.json"
 	},

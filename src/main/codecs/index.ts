@@ -1,25 +1,17 @@
-import br from './br.js';
-import df from './df.js';
-import gz from './gz.js';
-import lz from './lz.js';
-import lzma from './lzma.js';
-import lzstring from './lzstring.js';
-import lzw from './lzw.js';
-import pack from './pack.js';
-import raw from './raw.js';
-
 import type { CodecAlgorithmConfig } from '../types.js';
 
-const ALGORITHMS: Record<string, CodecAlgorithmConfig> = {
-	lzma,
-	lzstring,
-	lzw,
-	pack,
-	raw,
-	gz,
-	df,
-	br,
-	lz
+export type CodecAlgorithmLoader = () => Promise<CodecAlgorithmConfig>;
+
+const ALGORITHMS: Record<string, CodecAlgorithmLoader> = {
+	lzma: async () => (await import('./lzma.js')).default,
+	lzstring: async () => (await import('./lzstring.js')).default,
+	lzw: async () => (await import('./lzw.js')).default,
+	pack: async () => (await import('./pack.js')).default,
+	raw: async () => (await import('./raw.js')).default,
+	gz: async () => (await import('./gz.js')).default,
+	df: async () => (await import('./df.js')).default,
+	br: async () => (await import('./br.js')).default,
+	lz: async () => (await import('./lz.js')).default
 };
 
 export default ALGORITHMS;

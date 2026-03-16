@@ -13,11 +13,15 @@ export default defineConfig({
 		emptyOutDir: false,
 		sourcemap: true,
 		lib: {
-			entry: resolve(__dirname, 'src/main/index.ts'),
+			entry: {
+				index: resolve(__dirname, 'src/main/index.ts'),
+				'web-share': resolve(__dirname, 'src/main/web-share.ts')
+			},
 			name: 'JsonUrl',
 			formats: ['es', 'cjs'],
-			fileName(format) {
-				return format === 'es' ? 'index.js' : 'index.cjs';
+			fileName(format, entryName) {
+				const extension = format === 'es' ? 'js' : 'cjs';
+				return `${entryName}.${extension}`;
 			}
 		},
 		rollupOptions: {

@@ -1,4 +1,4 @@
-import LOADERS from '../loaders.js';
+import CORE_LOADERS from '../core-loaders.js';
 
 type StreamCodecFormat = 'gzip' | 'deflate-raw' | 'brotli';
 
@@ -114,7 +114,7 @@ export async function compressTextWithStreamCodec(
 	codecId: string
 ): Promise<Uint8Array> {
 	const input = new TextEncoder().encode(value);
-	const zlib = await LOADERS.zlib();
+	const zlib = await CORE_LOADERS.zlib();
 	if (zlib) {
 		const fallbackResult = compressWithNodeZlib(input, format, zlib);
 		if (fallbackResult) return fallbackResult;
@@ -135,7 +135,7 @@ export async function decompressTextWithStreamCodec(
 	codecId: string
 ): Promise<string> {
 	const input = buffer;
-	const zlib = await LOADERS.zlib();
+	const zlib = await CORE_LOADERS.zlib();
 	if (zlib) {
 		const fallbackResult = decompressWithNodeZlib(input, format, zlib);
 		if (fallbackResult) return new TextDecoder().decode(fallbackResult);

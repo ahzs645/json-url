@@ -1,6 +1,6 @@
 import { Buffer } from 'buffer';
 
-import LOADERS from '../loaders.js';
+import { loadLzma } from '../load-lzma.js';
 import type { CodecAlgorithmConfig } from '../types.js';
 
 const lzma: CodecAlgorithmConfig = {
@@ -8,7 +8,7 @@ const lzma: CodecAlgorithmConfig = {
 	encode: true,
 	async compress(input) {
 		const value = Buffer.from(input);
-		const api = await LOADERS.lzma();
+		const api = await loadLzma();
 
 		return new Promise<Uint8Array>((resolve, reject) => {
 			api.compress(value, 9, (byteArray, error) => {
@@ -23,7 +23,7 @@ const lzma: CodecAlgorithmConfig = {
 	},
 	async decompress(input) {
 		const value = Buffer.from(input);
-		const api = await LOADERS.lzma();
+		const api = await loadLzma();
 
 		return new Promise<Uint8Array>((resolve, reject) => {
 			api.decompress(value, (byteArray, error) => {
