@@ -39,6 +39,26 @@ describe('json-url engine', () => {
 		assert.ok(Array.isArray(createClient.availableCodecs));
 		assert.equal(typeof createClient.createEngine, 'function');
 		assert.equal(typeof createClient.createNamedCodec, 'function');
+		assert.equal(typeof createClient.createWebShareEngine, 'function');
+	});
+
+	it('supports the built-in web share codecs', async () => {
+		const sample = {
+			builderName: 'Untitled',
+			builderFields: [{ id: 'q1', type: 'text', label: 'Name' }],
+			layoutDrafts: []
+		};
+
+		for (const algorithm of ['raw', 'gz', 'df', 'br', 'lz']) {
+			const codec = createClient(algorithm);
+			const token = await codec.compress(sample);
+			const decompressed = await codec.decompress(token);
+
+			assert.equal(JSON.stringify(decompressed), JSON.stringify(sample));
+			if (algorithm !== 'lz') {
+				assert.ok(validate(token), `${algorithm} token should be URL-safe base64`);
+			}
+		}
 	});
 
 	it('applies transforms for the single-codec client API', async () => {
@@ -134,5 +154,24 @@ describe('json-url engine', () => {
 		});
 
 		await assert.rejects(() => engine.decompress('{"ok":true}'), /missing a version\/codec prefix/);
+	});
+
+	it('creates a web share engine with prefixed default codecs and a max length', async () => {
+		const engine = createClient.createWebShareEngine();
+		const detailed = await engine.compressDetailed({
+			builderName: 'Untitled',
+			builderFields: [{ id: 'q1', type: 'text', label: 'Name' }]
+		});
+		const decoded = await engine.decompress(detailed.token);
+
+		assert.deepEqual(engine.codecs, ['raw', 'gz', 'df', 'br', 'lz']);
+		assert.equal(engine.version, '1');
+		assert.equal(engine.skipUnsupportedCodecs, true);
+		assert.ok(detailed.token.startsWith('1.'));
+		assert.ok(detailed.compressedencoded <= 12000);
+		assert.equal(JSON.stringify(decoded), JSON.stringify({
+			builderName: 'Untitled',
+			builderFields: [{ id: 'q1', type: 'text', label: 'Name' }]
+		}));
 	});
 });

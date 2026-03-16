@@ -104,6 +104,40 @@ When you want to test multiple codecs and keep the shortest token, use `createEn
 	const original = await engine.decompress(token);
 ```
 
+### Web Share Engine
+
+`createWebShareEngine()` enables the Webforms-style transport defaults:
+
+* token format `1.codec.payload`
+* codecs `raw`, `gz`, `df`, `br`, `lz`
+* `alwaysPrefix: true`
+* `maxLength: 12000`
+* `skipUnsupportedCodecs: true`
+
+```
+	const JsonUrl = require('json-url');
+	const engine = JsonUrl.createWebShareEngine({
+		transforms: [
+			{
+				id: 'library-ref',
+				encode(value) {
+					if (!value.map || !value.map.embedded) return value;
+					return {
+						...value,
+						map: {
+							mapRef: value.map.id,
+							overrides: value.map.overrides || {}
+						}
+					};
+				},
+				decode(value) {
+					return value;
+				}
+			}
+		]
+	});
+```
+
 ### Standalone Browser Bundle
 
 ```
@@ -128,7 +162,13 @@ To see it in action, download the source code and run `npm run example`, or simp
 	* lzma
 	* lzstring - runs lzstring against a stringified JSON instead of using MessagePack on JSON
 	* pack - this just uses MessagePack and converts the binary buffer into a Base64 URL-safe representation, without any other compression
+	* raw - Base64URL encoded UTF-8 JSON bytes
+	* gz - gzip via `CompressionStream` with environment fallback
+	* df - deflate-raw via `CompressionStream` with environment fallback
+	* br - brotli via `CompressionStream` with environment fallback
+	* lz - `compressToEncodedURIComponent` / `decompressFromEncodedURIComponent`
 * `JsonUrl.createEngine()` can test multiple codecs, apply reversible transforms, and emit self-describing `version.codec.payload` tokens.
+* `JsonUrl.createWebShareEngine()` is a preset for `raw/gz/df/br/lz` with `version: "1"` and `maxLength: 12000`.
 
 ## Motivation
 

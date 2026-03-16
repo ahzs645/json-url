@@ -21,5 +21,25 @@ export default {
 		const module = await import(/* webpackChunkName: "lzw" */ 'node-lzw');
 		const lzw = module.default || module;
 		return lzw;
+	},
+	async zlib() {
+		if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
+			return null;
+		}
+
+		try {
+			const dynamicImport = new Function('specifier', 'return import(specifier)');
+			const module = await dynamicImport('node:zlib');
+			return module.default || module;
+		} catch {
+			try {
+				const dynamicRequire = new Function('return typeof require !== "undefined" ? require : null');
+				const requireFn = dynamicRequire();
+				if (!requireFn) return null;
+				return requireFn('zlib');
+			} catch {
+				return null;
+			}
+		}
 	}
 };

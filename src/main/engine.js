@@ -1,7 +1,11 @@
 import ALGORITHMS from 'main/codecs';
 import LOADERS from 'main/loaders';
+import { createUnsupportedCodecError } from 'main/codecs/stream-codec';
 
 const AVAILABLE_CODECS = Object.freeze(Object.keys(ALGORITHMS));
+const DEFAULT_WEB_SHARE_CODECS = Object.freeze(['raw', 'gz', 'df', 'br', 'lz']);
+const DEFAULT_WEB_SHARE_VERSION = '1';
+const DEFAULT_WEB_SHARE_MAX_LENGTH = 12000;
 
 function twoDigitPercentage(val) {
 	return Math.floor(val * 10000) / 10000;
@@ -184,6 +188,10 @@ function normalizeCodecSpec(codec, index) {
 	};
 }
 
+function isUnsupportedCodecError(error) {
+	return Boolean(error) && error.code === 'ERR_UNSUPPORTED_CODEC';
+}
+
 export function createNamedCodec(algorithm, options = {}) {
 	const transforms = normalizeTransforms(options.transforms);
 	const { id, config } = getAlgorithmConfig(algorithm);
@@ -245,6 +253,7 @@ export function createEngine(options = {}) {
 	const codecMap = new Map();
 	const maxLength = normalizeMaxLength(options.maxLength);
 	const version = typeof options.version === 'undefined' ? '1' : normalizeCodecId(String(options.version), 'version');
+	const skipUnsupportedCodecs = options.skipUnsupportedCodecs === true;
 	const alwaysPrefix = typeof options.alwaysPrefix === 'boolean'
 		? options.alwaysPrefix
 		: codecEntries.length !== 1;
@@ -277,25 +286,47 @@ export function createEngine(options = {}) {
 		const rawencoded = encodeURIComponent(rawText).length;
 		const transformedencoded = encodeURIComponent(transformedText).length;
 		const candidates = [];
+		const skipped = [];
 
 		for (const entry of codecEntries) {
-			const payload = await entry.client.compress(transformed);
-			if (typeof payload !== 'string') {
-				throw new Error(`Codec "${entry.id}" returned a non-string token`);
-			}
+			try {
+				const payload = await entry.client.compress(transformed);
+				if (typeof payload !== 'string') {
+					throw new Error(`Codec "${entry.id}" returned a non-string token`);
+				}
 
-			const token = alwaysPrefix ? buildToken(version, entry.id, payload) : payload;
-			candidates.push({
-				codec: entry.id,
-				token,
-				tokenLength: token.length,
-				payloadLength: payload.length,
-				raw: rawText.length,
-				rawencoded,
-				transformed: transformedText.length,
-				transformedencoded,
-				compression: twoDigitPercentage(rawencoded / token.length)
-			});
+				const token = alwaysPrefix ? buildToken(version, entry.id, payload) : payload;
+				candidates.push({
+					codec: entry.id,
+					token,
+					tokenLength: token.length,
+					payloadLength: payload.length,
+					raw: rawText.length,
+					rawencoded,
+					transformed: transformedText.length,
+					transformedencoded,
+					compression: twoDigitPercentage(rawencoded / token.length)
+				});
+			} catch (error) {
+				if (!skipUnsupportedCodecs || !isUnsupportedCodecError(error)) {
+					throw error;
+				}
+
+				skipped.push({
+					codec: entry.id,
+					reason: error.message
+				});
+			}
+		}
+
+		if (candidates.length === 0) {
+			if (skipped.length > 0) {
+				throw createUnsupportedCodecError(
+					'engine',
+					`None of the configured codecs are supported in this environment: ${skipped.map((entry) => entry.codec).join(', ')}`
+				);
+			}
+			throw new Error('No codec candidates were produced');
 		}
 
 		candidates.sort((a, b) => a.tokenLength - b.tokenLength);
@@ -314,7 +345,8 @@ export function createEngine(options = {}) {
 			transformedencoded,
 			compressedencoded: best.tokenLength,
 			compression: best.compression,
-			candidates
+			candidates,
+			skipped
 		};
 	}
 
@@ -354,6 +386,7 @@ export function createEngine(options = {}) {
 		version,
 		codecs: codecEntries.map((entry) => entry.id),
 		transforms: transforms.map((transform) => transform.id),
+		skipUnsupportedCodecs,
 		compress,
 		compressBest: compressDetailed,
 		compressDetailed,
@@ -362,4 +395,26 @@ export function createEngine(options = {}) {
 	};
 }
 
-export { AVAILABLE_CODECS };
+export function createWebShareEngine(options = {}) {
+	const nextOptions = {
+		...options,
+		version: typeof options.version === 'undefined' ? DEFAULT_WEB_SHARE_VERSION : options.version,
+		alwaysPrefix: typeof options.alwaysPrefix === 'undefined' ? true : options.alwaysPrefix,
+		maxLength: typeof options.maxLength === 'undefined' ? DEFAULT_WEB_SHARE_MAX_LENGTH : options.maxLength,
+		skipUnsupportedCodecs: typeof options.skipUnsupportedCodecs === 'undefined' ? true : options.skipUnsupportedCodecs,
+		codecs: Array.isArray(options.codecs) && options.codecs.length > 0
+			? options.codecs
+			: DEFAULT_WEB_SHARE_CODECS
+	};
+
+	return createEngine({
+		...nextOptions
+	});
+}
+
+export {
+	AVAILABLE_CODECS,
+	DEFAULT_WEB_SHARE_CODECS,
+	DEFAULT_WEB_SHARE_MAX_LENGTH,
+	DEFAULT_WEB_SHARE_VERSION
+};

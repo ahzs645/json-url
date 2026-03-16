@@ -4,9 +4,10 @@ var _interopRequireDefault = require("@babel/runtime/helpers/interopRequireDefau
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.AVAILABLE_CODECS = void 0;
+exports.DEFAULT_WEB_SHARE_VERSION = exports.DEFAULT_WEB_SHARE_MAX_LENGTH = exports.DEFAULT_WEB_SHARE_CODECS = exports.AVAILABLE_CODECS = void 0;
 exports.createEngine = createEngine;
 exports.createNamedCodec = createNamedCodec;
+exports.createWebShareEngine = createWebShareEngine;
 var _regenerator = _interopRequireDefault(require("@babel/runtime/regenerator"));
 var _toConsumableArray2 = _interopRequireDefault(require("@babel/runtime/helpers/toConsumableArray"));
 var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/defineProperty"));
@@ -14,12 +15,16 @@ var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime/helpers/
 var _typeof2 = _interopRequireDefault(require("@babel/runtime/helpers/typeof"));
 var _codecs = _interopRequireDefault(require("./codecs"));
 var _loaders = _interopRequireDefault(require("./loaders"));
+var _streamCodec = require("./codecs/stream-codec");
 function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t["return"] || t["return"](); } finally { if (u) throw o; } } }; }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
 function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
 function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
 function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { (0, _defineProperty2["default"])(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
 var AVAILABLE_CODECS = exports.AVAILABLE_CODECS = Object.freeze(Object.keys(_codecs["default"]));
+var DEFAULT_WEB_SHARE_CODECS = exports.DEFAULT_WEB_SHARE_CODECS = Object.freeze(['raw', 'gz', 'df', 'br', 'lz']);
+var DEFAULT_WEB_SHARE_VERSION = exports.DEFAULT_WEB_SHARE_VERSION = '1';
+var DEFAULT_WEB_SHARE_MAX_LENGTH = exports.DEFAULT_WEB_SHARE_MAX_LENGTH = 12000;
 function twoDigitPercentage(val) {
   return Math.floor(val * 10000) / 10000;
 }
@@ -62,7 +67,7 @@ function applyTransforms(_x, _x2, _x3) {
 }
 function _applyTransforms() {
   _applyTransforms = (0, _asyncToGenerator2["default"])(/*#__PURE__*/_regenerator["default"].mark(function _callee0(value, transforms, direction) {
-    var ordered, next, _iterator2, _step2, transform, handler, _t2;
+    var ordered, next, _iterator2, _step2, transform, handler, _t3;
     return _regenerator["default"].wrap(function (_context0) {
       while (1) switch (_context0.prev = _context0.next) {
         case 0:
@@ -96,8 +101,8 @@ function _applyTransforms() {
           break;
         case 7:
           _context0.prev = 7;
-          _t2 = _context0["catch"](1);
-          _iterator2.e(_t2);
+          _t3 = _context0["catch"](1);
+          _iterator2.e(_t3);
         case 8:
           _context0.prev = 8;
           _iterator2.f();
@@ -303,6 +308,9 @@ function normalizeCodecSpec(codec, index) {
     client: codec
   };
 }
+function isUnsupportedCodecError(error) {
+  return Boolean(error) && error.code === 'ERR_UNSUPPORTED_CODEC';
+}
 function createNamedCodec(algorithm) {
   var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
   var transforms = normalizeTransforms(options.transforms);
@@ -455,6 +463,7 @@ function createEngine() {
   var codecMap = new Map();
   var maxLength = normalizeMaxLength(options.maxLength);
   var version = typeof options.version === 'undefined' ? '1' : normalizeCodecId(String(options.version), 'version');
+  var skipUnsupportedCodecs = options.skipUnsupportedCodecs === true;
   var alwaysPrefix = typeof options.alwaysPrefix === 'boolean' ? options.alwaysPrefix : codecEntries.length !== 1;
   var defaultCodec = typeof options.defaultCodec === 'undefined' ? (_codecEntries$ = codecEntries[0]) === null || _codecEntries$ === void 0 ? void 0 : _codecEntries$.id : normalizeCodecId(options.defaultCodec, 'default codec');
   codecEntries.forEach(function (entry) {
@@ -497,7 +506,7 @@ function createEngine() {
   }
   function _compressDetailed() {
     _compressDetailed = (0, _asyncToGenerator2["default"])(/*#__PURE__*/_regenerator["default"].mark(function _callee6(json) {
-      var _yield$prepareInput3, rawText, transformed, transformedText, rawencoded, transformedencoded, candidates, _iterator, _step, entry, payload, token, best, _t;
+      var _yield$prepareInput3, rawText, transformed, transformedText, rawencoded, transformedencoded, candidates, skipped, _iterator, _step, entry, payload, token, best, _t, _t2;
       return _regenerator["default"].wrap(function (_context6) {
         while (1) switch (_context6.prev = _context6.next) {
           case 0:
@@ -511,25 +520,27 @@ function createEngine() {
             rawencoded = encodeURIComponent(rawText).length;
             transformedencoded = encodeURIComponent(transformedText).length;
             candidates = [];
+            skipped = [];
             _iterator = _createForOfIteratorHelper(codecEntries);
             _context6.prev = 2;
             _iterator.s();
           case 3:
             if ((_step = _iterator.n()).done) {
-              _context6.next = 7;
+              _context6.next = 10;
               break;
             }
             entry = _step.value;
-            _context6.next = 4;
+            _context6.prev = 4;
+            _context6.next = 5;
             return entry.client.compress(transformed);
-          case 4:
+          case 5:
             payload = _context6.sent;
             if (!(typeof payload !== 'string')) {
-              _context6.next = 5;
+              _context6.next = 6;
               break;
             }
             throw new Error("Codec \"".concat(entry.id, "\" returned a non-string token"));
-          case 5:
+          case 6:
             token = alwaysPrefix ? buildToken(version, entry.id, payload) : payload;
             candidates.push({
               codec: entry.id,
@@ -542,31 +553,60 @@ function createEngine() {
               transformedencoded: transformedencoded,
               compression: twoDigitPercentage(rawencoded / token.length)
             });
-          case 6:
-            _context6.next = 3;
-            break;
-          case 7:
             _context6.next = 9;
             break;
+          case 7:
+            _context6.prev = 7;
+            _t = _context6["catch"](4);
+            if (!(!skipUnsupportedCodecs || !isUnsupportedCodecError(_t))) {
+              _context6.next = 8;
+              break;
+            }
+            throw _t;
           case 8:
-            _context6.prev = 8;
-            _t = _context6["catch"](2);
-            _iterator.e(_t);
+            skipped.push({
+              codec: entry.id,
+              reason: _t.message
+            });
           case 9:
-            _context6.prev = 9;
-            _iterator.f();
-            return _context6.finish(9);
+            _context6.next = 3;
+            break;
           case 10:
+            _context6.next = 12;
+            break;
+          case 11:
+            _context6.prev = 11;
+            _t2 = _context6["catch"](2);
+            _iterator.e(_t2);
+          case 12:
+            _context6.prev = 12;
+            _iterator.f();
+            return _context6.finish(12);
+          case 13:
+            if (!(candidates.length === 0)) {
+              _context6.next = 15;
+              break;
+            }
+            if (!(skipped.length > 0)) {
+              _context6.next = 14;
+              break;
+            }
+            throw (0, _streamCodec.createUnsupportedCodecError)('engine', "None of the configured codecs are supported in this environment: ".concat(skipped.map(function (entry) {
+              return entry.codec;
+            }).join(', ')));
+          case 14:
+            throw new Error('No codec candidates were produced');
+          case 15:
             candidates.sort(function (a, b) {
               return a.tokenLength - b.tokenLength;
             });
             best = candidates[0];
             if (!(best.tokenLength > maxLength)) {
-              _context6.next = 11;
+              _context6.next = 16;
               break;
             }
             throw new Error("Encoded token exceeds maxLength (".concat(best.tokenLength, " > ").concat(maxLength, ")"));
-          case 11:
+          case 16:
             return _context6.abrupt("return", {
               codec: best.codec,
               token: best.token,
@@ -576,13 +616,14 @@ function createEngine() {
               transformedencoded: transformedencoded,
               compressedencoded: best.tokenLength,
               compression: best.compression,
-              candidates: candidates
+              candidates: candidates,
+              skipped: skipped
             });
-          case 12:
+          case 17:
           case "end":
             return _context6.stop();
         }
-      }, _callee6, null, [[2, 8, 9, 10]]);
+      }, _callee6, null, [[2, 11, 12, 13], [4, 7]]);
     }));
     return _compressDetailed.apply(this, arguments);
   }
@@ -684,10 +725,22 @@ function createEngine() {
     transforms: transforms.map(function (transform) {
       return transform.id;
     }),
+    skipUnsupportedCodecs: skipUnsupportedCodecs,
     compress: compress,
     compressBest: compressDetailed,
     compressDetailed: compressDetailed,
     decompress: decompress,
     stats: stats
   };
+}
+function createWebShareEngine() {
+  var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var nextOptions = _objectSpread(_objectSpread({}, options), {}, {
+    version: typeof options.version === 'undefined' ? DEFAULT_WEB_SHARE_VERSION : options.version,
+    alwaysPrefix: typeof options.alwaysPrefix === 'undefined' ? true : options.alwaysPrefix,
+    maxLength: typeof options.maxLength === 'undefined' ? DEFAULT_WEB_SHARE_MAX_LENGTH : options.maxLength,
+    skipUnsupportedCodecs: typeof options.skipUnsupportedCodecs === 'undefined' ? true : options.skipUnsupportedCodecs,
+    codecs: Array.isArray(options.codecs) && options.codecs.length > 0 ? options.codecs : DEFAULT_WEB_SHARE_CODECS
+  });
+  return createEngine(_objectSpread({}, nextOptions));
 }
