@@ -159,7 +159,7 @@ When you want to test multiple codecs and keep the shortest token, use `createEn
 ### Standalone Browser Bundle
 
 ```
-<script type="text/javascript" src="/dist/browser/json-url.js"></script>
+<script type="text/javascript" src="/dist/browser/json-url-single.js"></script>
 <script>
 	const lib = JsonUrl('lzma'); // JsonUrl is added to the window object
 	lib.compress(parsed).then(output => { result.value = output; });
@@ -168,8 +168,8 @@ When you want to test multiple codecs and keep the shortest token, use `createEn
 
 To see it in action, download the source code and run `npm run example`, or simply visit [this link](http://jsbin.com/cayuhox).
 
-* The browser bundle is generated using Webpack and consists of multiple chunks, with the main chunk entry point located at `dist/browser/json-url.js`. Chunks must be located in the same folder as the main module itself.
-* I've tried my best to reduce the bundle sizes, but the module (at least the entry) is still surprisingly large on the browser (56kb minified, 20kb gzipped). Most of it is due to the buffer.js shim, and partly due to the regenerator-runtime - I may revisit this later to try and improve efficiency.
+* The browser bundle is now generated with Vite/Rollup as a single UMD file at `dist/browser/json-url-single.js`.
+* The bundle is still relatively large because it includes runtime polyfills and codec dependencies needed for standalone browser use.
 
 ## Usage Notes
 
@@ -196,6 +196,7 @@ The package now exposes:
 * CommonJS via `require('json-url')`
 * ESM via `import JsonUrl from 'json-url'`
 * Browser UMD bundle via `json-url/browser`
+* Type declarations via `dist/index.d.ts`
 
 ## Motivation
 

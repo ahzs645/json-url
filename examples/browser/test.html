@@ -96,6 +96,11 @@
 			<div>
 				<label for="algorithm">Algorithm</label>
 				<select id="algorithm" name="algorithm">
+					<option value="raw">raw</option>
+					<option value="gz">gz</option>
+					<option value="df">df</option>
+					<option value="br">br</option>
+					<option value="lz">lz</option>
 					<option value="lzw">lzw</option>
 					<option value="lzma">lzma</option>
 					<option value="lzstring">lzstring</option>
@@ -120,7 +125,7 @@
 			</div>
 		</div>
 	</body>
-	<script type="text/javascript" src="/dist/browser/json-url.js"></script>
+	<script type="text/javascript" src="/dist/browser/json-url-single.js"></script>
 	<script>
 		/* eslint-disable */
 		json.value = JSON.stringify({

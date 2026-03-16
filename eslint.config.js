@@ -1,44 +1,25 @@
-// eslint.config.js
-import js from "@eslint/js";
-import importPlugin from "eslint-plugin-import";
-import babelParser from "@babel/eslint-parser";
-import globals from "globals";
+import js from '@eslint/js';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
 
-export default [
-  {
-    ignores: ["dist/**", "coverage/**"],
-  },
-
-  // Core recommended rules
-  js.configs.recommended,
-
-  // import plugin's recommended rules
-  importPlugin.flatConfigs.recommended,
-
-  {
-    files: ["**/*.{js,mjs,cjs}"],
-    languageOptions: {
-      parser: babelParser,
-      parserOptions: {
-        requireConfigFile: false, // no .babelrc needed to lint
-        sourceType: "module",
-        ecmaVersion: "latest",
-      },
-      globals: {
-        ...globals.node,
-        ...globals.es2021,
-      },
-    },
-    settings: {
-      // keep your resolver from .eslintrc
-      "import/resolver": {
-        "babel-module": {},
-      },
-    },
-    rules: {
-      "no-undef": "error",
-      "no-unused-vars": "error",
-      "no-console": "off",
-    },
-  },
-];
+export default tseslint.config(
+	{
+		ignores: ['dist/**', 'coverage/**']
+	},
+	js.configs.recommended,
+	...tseslint.configs.recommended,
+	{
+		files: ['**/*.{ts,mts,cts}'],
+		languageOptions: {
+			ecmaVersion: 'latest',
+			sourceType: 'module',
+			globals: {
+				...globals.browser,
+				...globals.node
+			}
+		},
+		rules: {
+			'no-console': 'off'
+		}
+	}
+);

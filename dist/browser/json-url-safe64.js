@@ -1,2 +1,0 @@
-/*! For license information please see json-url-safe64.js.LICENSE.txt */
-(self.webpackChunkJsonUrl=self.webpackChunkJsonUrl||[]).push([[622],{421:(e,r,n)=>{e.exports=n(5253)},5253:(e,r,n)=>{var a=n(8287).Buffer;r.version="1.0.0",r.encode=function(e){return e.toString("base64").replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")},r.decode=function(e){return e=(e+=Array(5-e.length%4).join("=")).replace(/\-/g,"+").replace(/\_/g,"/"),new a(e,"base64")},r.validate=function(e){return/^[A-Za-z0-9\-_]+$/.test(e)}}}]);
