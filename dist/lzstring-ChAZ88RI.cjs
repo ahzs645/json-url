@@ -1,0 +1,2 @@
+const e=require(`./load-lzstring-BpjGzIw_.cjs`);let t=require(`buffer`);var n={pack:!1,encode:!0,async compress(n){return t.Buffer.from((await e.t()).compressToUint8Array(String(n)))},async decompress(n){return(await e.t()).decompressFromUint8Array(typeof n==`string`?new TextEncoder().encode(n):t.Buffer.from(n))}};exports.default=n;
+//# sourceMappingURL=lzstring-ChAZ88RI.cjs.map

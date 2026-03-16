@@ -39,7 +39,7 @@ interface CodecEntry {
 }
 
 const AVAILABLE_CODECS = Object.freeze(Object.keys(ALGORITHMS));
-const DEFAULT_WEB_SHARE_CODECS = Object.freeze(['raw', 'gz', 'df', 'br', 'lz']);
+const DEFAULT_WEB_SHARE_CODECS = Object.freeze(['raw', 'gz', 'df', 'zl', 'br', 'lz']);
 const DEFAULT_WEB_SHARE_VERSION = '1';
 const DEFAULT_WEB_SHARE_MAX_LENGTH = 12000;
 

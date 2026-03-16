@@ -1,2 +1,0 @@
-let e=require(`buffer`);function t(e){return e.default||e}async function n(){let e=t(await import(`lzma`));return typeof e.compress==`function`?e:e.LZMA}var r={pack:!0,encode:!0,async compress(t){let r=e.Buffer.from(t),i=await n();return new Promise((t,n)=>{i.compress(r,9,(r,i)=>{if(i){n(i);return}t(e.Buffer.from(r))})})},async decompress(t){let r=e.Buffer.from(t),i=await n();return new Promise((t,n)=>{i.decompress(r,(r,i)=>{if(i){n(i);return}t(e.Buffer.from(r))})})}};exports.default=r;
-//# sourceMappingURL=lzma-Fup7fTKG.cjs.map

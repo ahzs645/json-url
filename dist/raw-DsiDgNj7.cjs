@@ -1,0 +1,2 @@
+const e=require(`./rolldown-runtime-DtFnurYI.cjs`);let t=require(`buffer`);var n=e.t({default:()=>r}),r={pack:!1,encode:!0,async compress(e){return t.Buffer.from(typeof e==`string`?e:t.Buffer.from(e).toString(`utf8`),`utf8`)},async decompress(e){return t.Buffer.from(typeof e==`string`?t.Buffer.from(e,`utf8`):e).toString(`utf8`)}};Object.defineProperty(exports,`n`,{enumerable:!0,get:function(){return n}}),Object.defineProperty(exports,`t`,{enumerable:!0,get:function(){return r}});
+//# sourceMappingURL=raw-DsiDgNj7.cjs.map

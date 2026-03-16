@@ -10,6 +10,7 @@ const ALGORITHMS: Record<string, CodecAlgorithmLoader> = {
 	raw: async () => (await import('./raw.js')).default,
 	gz: async () => (await import('./gz.js')).default,
 	df: async () => (await import('./df.js')).default,
+	zl: async () => (await import('./zl.js')).default,
 	br: async () => (await import('./br.js')).default,
 	lz: async () => (await import('./lz.js')).default
 };

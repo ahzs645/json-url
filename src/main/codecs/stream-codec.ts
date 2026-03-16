@@ -1,6 +1,6 @@
 import CORE_LOADERS from '../core-loaders.js';
 
-type StreamCodecFormat = 'gzip' | 'deflate-raw' | 'brotli';
+type StreamCodecFormat = 'gzip' | 'deflate' | 'deflate-raw' | 'brotli';
 
 interface UnsupportedCodecError extends Error {
 	code: 'ERR_UNSUPPORTED_CODEC';
@@ -80,6 +80,8 @@ function compressWithNodeZlib(
 	switch (format) {
 	case 'gzip':
 		return zlib.gzipSync(input);
+	case 'deflate':
+		return zlib.deflateSync(input);
 	case 'deflate-raw':
 		return zlib.deflateRawSync(input);
 	case 'brotli':
@@ -98,6 +100,8 @@ function decompressWithNodeZlib(
 	switch (format) {
 	case 'gzip':
 		return zlib.gunzipSync(input);
+	case 'deflate':
+		return zlib.inflateSync(input);
 	case 'deflate-raw':
 		return zlib.inflateRawSync(input);
 	case 'brotli':

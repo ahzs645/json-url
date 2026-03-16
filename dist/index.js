@@ -1,21 +1,23 @@
 import { n as e, t } from "./decode-utils-BMvRxlTb.js";
-import { i as n, n as r } from "./stream-codec-D4-Gns2a.js";
+import { i as n, n as r } from "./stream-codec-Bx0Tud9V.js";
 import { Buffer as i } from "buffer";
 //#region src/main/codecs/index.ts
 var a = {
-	lzma: async () => (await import("./lzma-B6qVLRSl.js")).default,
-	lzstring: async () => (await import("./lzstring-D9FpqWVz.js")).default,
-	lzw: async () => (await import("./lzw-DWvkljQM.js")).default,
-	pack: async () => (await import("./pack-BMxO0Pu0.js")).default,
-	raw: async () => (await import("./raw-aEoG8x84.js").then((e) => e.n)).default,
-	gz: async () => (await import("./gz-DTcVIu1M.js").then((e) => e.n)).default,
-	df: async () => (await import("./df-BmqYyyJq.js").then((e) => e.n)).default,
-	br: async () => (await import("./br-BYKIWxqK.js").then((e) => e.n)).default,
-	lz: async () => (await import("./lz-BjJzlp3o.js").then((e) => e.n)).default
+	lzma: async () => (await import("./lzma-CIAYv-bl.js")).default,
+	lzstring: async () => (await import("./lzstring-DuXph4B_.js")).default,
+	lzw: async () => (await import("./lzw-BhWZrokT.js")).default,
+	pack: async () => (await import("./pack-eK2uIy_a.js")).default,
+	raw: async () => (await import("./raw-DFCsiHFO.js").then((e) => e.n)).default,
+	gz: async () => (await import("./gz-iW3RIAMa.js").then((e) => e.n)).default,
+	df: async () => (await import("./df-C5_I-Tm4.js").then((e) => e.n)).default,
+	zl: async () => (await import("./zl-C5BQpHjN.js").then((e) => e.n)).default,
+	br: async () => (await import("./br-DrSvobxd.js").then((e) => e.n)).default,
+	lz: async () => (await import("./lz-YJ-6p0Xx.js").then((e) => e.n)).default
 }, o = Object.freeze(Object.keys(a)), s = Object.freeze([
 	"raw",
 	"gz",
 	"df",
+	"zl",
 	"br",
 	"lz"
 ]), c = 12e3;

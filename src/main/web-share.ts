@@ -3,6 +3,7 @@ import { Buffer } from 'buffer';
 import br from './codecs/br.js';
 import df from './codecs/df.js';
 import gz from './codecs/gz.js';
+import zl from './codecs/zl.js';
 import lz from './codecs/lz.js';
 import raw from './codecs/raw.js';
 import { prepareEncodedInput } from './decode-utils.js';
@@ -41,11 +42,12 @@ const WEB_SHARE_ALGORITHMS: Record<string, CodecAlgorithmConfig> = {
 	raw,
 	gz,
 	df,
+	zl,
 	br,
 	lz
 };
 
-const DEFAULT_WEB_SHARE_CODECS = Object.freeze(['raw', 'gz', 'df', 'br', 'lz']);
+const DEFAULT_WEB_SHARE_CODECS = Object.freeze(['raw', 'gz', 'df', 'zl', 'br', 'lz']);
 const DEFAULT_WEB_SHARE_VERSION = '1';
 const DEFAULT_WEB_SHARE_MAX_LENGTH = 12000;
 

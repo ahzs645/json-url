@@ -1,4 +1,4 @@
-type StreamCodecFormat = 'gzip' | 'deflate-raw' | 'brotli';
+type StreamCodecFormat = 'gzip' | 'deflate' | 'deflate-raw' | 'brotli';
 interface UnsupportedCodecError extends Error {
     code: 'ERR_UNSUPPORTED_CODEC';
     codec: string;

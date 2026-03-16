@@ -1,0 +1,2 @@
+let e=require(`buffer`);function t(e){return e.default||e}async function n(){return t(await import(`node-lzw`))}var r={pack:!0,encode:!0,async compress(t){let r=e.Buffer.from(t);return e.Buffer.from((await n()).encode(r.toString(`binary`)))},async decompress(t){return e.Buffer.from((await n()).decode(e.Buffer.from(t)),`binary`)}};exports.default=r;
+//# sourceMappingURL=lzw-5hKteyrb.cjs.map

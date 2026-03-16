@@ -1,2 +1,0 @@
-function e(e){return e.default||e}async function t(){return e(await import(`lz-string`))}Object.defineProperty(exports,`t`,{enumerable:!0,get:function(){return t}});
-//# sourceMappingURL=load-lzstring-D-gFfx_m.cjs.map

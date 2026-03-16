@@ -1,2 +1,0 @@
-const e=require(`./rolldown-runtime-DtFnurYI.cjs`),t=require(`./load-lzstring-D-gFfx_m.cjs`);var n=e.t({default:()=>r}),r={pack:!1,encode:!1,async compress(e){return(await t.t()).compressToEncodedURIComponent(String(e))},async decompress(e){let n=(await t.t()).decompressFromEncodedURIComponent(String(e));if(n===null)throw Error(`Unable to decode lz codec payload`);return n}};Object.defineProperty(exports,`n`,{enumerable:!0,get:function(){return n}}),Object.defineProperty(exports,`t`,{enumerable:!0,get:function(){return r}});
-//# sourceMappingURL=lz-DxFBpJCp.cjs.map

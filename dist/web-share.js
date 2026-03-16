@@ -1,43 +1,46 @@
 import { n as e } from "./decode-utils-BMvRxlTb.js";
-import { i as t } from "./stream-codec-D4-Gns2a.js";
-import { t as n } from "./br-BYKIWxqK.js";
-import { t as r } from "./df-BmqYyyJq.js";
-import { t as i } from "./gz-DTcVIu1M.js";
-import "./load-lzstring-24cQWH2f.js";
-import { t as a } from "./lz-BjJzlp3o.js";
-import { t as o } from "./raw-aEoG8x84.js";
-import { Buffer as s } from "buffer";
+import { i as t } from "./stream-codec-Bx0Tud9V.js";
+import { t as n } from "./br-DrSvobxd.js";
+import { t as r } from "./df-C5_I-Tm4.js";
+import { t as i } from "./gz-iW3RIAMa.js";
+import { t as a } from "./zl-C5BQpHjN.js";
+import "./load-lzstring-Bp-ev5a0.js";
+import { t as o } from "./lz-YJ-6p0Xx.js";
+import { t as s } from "./raw-DFCsiHFO.js";
+import { Buffer as c } from "buffer";
 //#region src/main/web-share.ts
-var c = {
-	raw: o,
+var l = {
+	raw: s,
 	gz: i,
 	df: r,
+	zl: a,
 	br: n,
-	lz: a
-}, l = Object.freeze([
+	lz: o
+}, u = Object.freeze([
 	"raw",
 	"gz",
 	"df",
+	"zl",
 	"br",
 	"lz"
-]), u = "1", d = 12e3;
-function f(e) {
+]), d = "1", f = 12e3;
+function p(e) {
 	return Math.floor(e * 1e4) / 1e4;
 }
-function p(e) {
+function m(e) {
 	return !!e && typeof e == "object" && !Array.isArray(e);
 }
-function m(e, t = "codec") {
+function h(e, t = "codec") {
 	if (typeof e != "string" || !e.trim()) throw Error(`Expected ${t} to have a non-empty string id`);
 	let n = e.trim();
 	if (n.includes(".")) throw Error(`Expected ${t} id to not contain "."`);
 	return n;
 }
-function h(e = []) {
+function g(e = []) {
 	if (!e) return [];
 	if (!Array.isArray(e)) throw Error("Expected transforms to be an array");
 	return e.map((e, t) => {
-		if (!p(e)) throw Error(`Transform at index ${t} must be an object`);
+		if (!m(e)) throw Error(`Transform at index ${t} must be an object`);
 		let n = e;
 		if (typeof n.encode != "function" && typeof n.decode != "function") throw Error(`Transform at index ${t} must provide encode or decode`);
 		return {
@@ -47,7 +50,7 @@ function h(e = []) {
 		};
 	});
 }
-async function g(e, t, n) {
+async function _(e, t, n) {
 	let r = n === "encode" ? t : [...t].reverse(), i = e;
 	for (let e of r) {
 		let t = n === "encode" ? e.encode : e.decode;
@@ -55,22 +58,22 @@ async function g(e, t, n) {
 	}
 	return i;
 }
-async function _(e, n) {
+async function v(e, n) {
 	return n.pack ? (await t.msgpack()).encode(e) : JSON.stringify(e);
 }
-async function v(e, n) {
-	return n.pack ? (await t.msgpack()).decode(s.from(e)) : JSON.parse(String(e));
-}
 async function y(e, n) {
-	return n.encode ? (await t.safe64()).encode(typeof e == "string" ? s.from(e, "utf8") : s.from(e)) : typeof e == "string" ? e : s.from(e).toString("utf8");
+	return n.pack ? (await t.msgpack()).decode(c.from(e)) : JSON.parse(String(e));
 }
 async function b(e, n) {
+	return n.encode ? (await t.safe64()).encode(typeof e == "string" ? c.from(e, "utf8") : c.from(e)) : typeof e == "string" ? e : c.from(e).toString("utf8");
+}
+async function x(e, n) {
 	return n.encode ? (await t.safe64()).decode(e) : e;
 }
-function x(e, t, n) {
+function S(e, t, n) {
 	return `${e}.${t}.${n}`;
 }
-function S(e) {
+function C(e) {
 	if (typeof e != "string" || !e.trim()) throw Error("Expected token to be a non-empty string");
 	let t = e.trim(), n = t.indexOf("."), r = t.indexOf(".", n + 1);
 	return n <= 0 || r <= n + 1 ? null : {
@@ -79,45 +82,45 @@ function S(e) {
 		payload: t.slice(r + 1)
 	};
 }
-function C(e) {
+function w(e) {
 	if (e == null) return Infinity;
 	if (typeof e != "number" || !Number.isFinite(e) || e <= 0) throw Error("Expected maxLength to be a positive finite number");
 	return Math.floor(e);
 }
-function w(e, t) {
+function T(e, t) {
 	return {
 		id: e,
 		async compress(e) {
-			let n = await _(e, t);
-			return y(await t.compress(n), t);
+			let n = await v(e, t);
+			return b(await t.compress(n), t);
 		},
 		async decompress(e) {
-			let n = await b(e, t);
-			return v(await t.decompress(n), t);
+			let n = await x(e, t);
+			return y(await t.decompress(n), t);
 		}
 	};
 }
-function T(e, t) {
+function E(e, t) {
 	if (typeof e == "string") {
-		let n = m(e, `codec at index ${t}`), r = c[n];
+		let n = h(e, `codec at index ${t}`), r = l[n];
 		if (!r) throw Error(`Unknown web share codec "${n}"`);
 		return {
 			id: n,
-			client: w(n, r)
+			client: T(n, r)
 		};
 	}
-	if (!p(e)) throw Error(`Codec at index ${t} must be a string or codec object`);
-	let n = m(String(e.id), `codec at index ${t}`);
+	if (!m(e)) throw Error(`Codec at index ${t} must be a string or codec object`);
+	let n = h(String(e.id), `codec at index ${t}`);
 	if (typeof e.compress != "function" || typeof e.decompress != "function") throw Error(`Codec "${n}" must provide compress and decompress`);
 	return {
 		id: n,
 		client: e
 	};
 }
-function E(e) {
+function D(e) {
 	return !!e && typeof e == "object" && e.code === "ERR_UNSUPPORTED_CODEC";
 }
-function D({ rawText: e, transformedText: t, tokenLength: n, codecId: r, token: i }) {
+function O({ rawText: e, transformedText: t, tokenLength: n, codecId: r, token: i }) {
 	let a = encodeURIComponent(e).length, o = encodeURIComponent(t).length;
 	return {
 		codec: r,
@@ -127,17 +130,17 @@ function D({ rawText: e, transformedText: t, tokenLength: n, codecId: r, token: 
 		transformed: t.length,
 		transformedencoded: o,
 		compressedencoded: n,
-		compression: f(a / n)
+		compression: p(a / n)
 	};
 }
-function O(t = {}) {
-	let n = h(t.transforms), r = n.map((e) => e.id), i = (Array.isArray(t.codecs) && t.codecs.length > 0 ? t.codecs : Array.from(l)).map((e, t) => T(e, t)), a = /* @__PURE__ */ new Map(), o = C(t.maxLength === void 0 ? d : t.maxLength), s = t.version === void 0 ? u : m(String(t.version), "version"), c = t.skipUnsupportedCodecs === void 0 ? !0 : t.skipUnsupportedCodecs === !0, p = t.alwaysPrefix === void 0 ? !0 : t.alwaysPrefix, _ = t.defaultCodec === void 0 ? i[0]?.id : m(t.defaultCodec, "default codec");
+function k(t = {}) {
+	let n = g(t.transforms), r = n.map((e) => e.id), i = (Array.isArray(t.codecs) && t.codecs.length > 0 ? t.codecs : Array.from(u)).map((e, t) => E(e, t)), a = /* @__PURE__ */ new Map(), o = w(t.maxLength === void 0 ? f : t.maxLength), s = t.version === void 0 ? d : h(String(t.version), "version"), c = t.skipUnsupportedCodecs === void 0 ? !0 : t.skipUnsupportedCodecs === !0, l = t.alwaysPrefix === void 0 ? !0 : t.alwaysPrefix, m = t.defaultCodec === void 0 ? i[0]?.id : h(t.defaultCodec, "default codec");
 	if (i.forEach((e) => {
 		if (a.has(e.id)) throw Error(`Duplicate codec id "${e.id}"`);
 		a.set(e.id, e);
-	}), !_ || !a.has(_)) throw Error(`Unknown default codec "${_}"`);
+	}), !m || !a.has(m)) throw Error(`Unknown default codec "${m}"`);
 	async function v(e) {
-		let t = await g(e, n, "encode");
+		let t = await _(e, n, "encode");
 		return {
 			rawText: JSON.stringify(e),
 			transformed: t,
@@ -145,12 +148,12 @@ function O(t = {}) {
 		};
 	}
 	async function y(e) {
-		let { rawText: t, transformed: n, transformedText: r } = await v(e), a = encodeURIComponent(t).length, l = encodeURIComponent(r).length, u = [], d = [];
+		let { rawText: t, transformed: n, transformedText: r } = await v(e), a = encodeURIComponent(t).length, u = encodeURIComponent(r).length, d = [], f = [];
 		for (let e of i) try {
 			let i = await e.client.compress(n);
 			if (typeof i != "string") throw Error(`Codec "${e.id}" returned a non-string token`);
-			let o = p ? x(s, e.id, i) : i;
-			u.push({
+			let o = l ? S(s, e.id, i) : i;
+			d.push({
 				codec: e.id,
 				token: o,
 				tokenLength: o.length,
@@ -158,45 +161,45 @@ function O(t = {}) {
 				raw: t.length,
 				rawencoded: a,
 				transformed: r.length,
-				transformedencoded: l,
-				compression: f(a / o.length)
+				transformedencoded: u,
+				compression: p(a / o.length)
 			});
 		} catch (t) {
-			if (!c || !E(t)) throw t;
-			d.push({
+			if (!c || !D(t)) throw t;
+			f.push({
 				codec: e.id,
 				reason: t.message
 			});
 		}
-		if (u.length === 0) throw Error("No codec candidates were produced");
-		u.sort((e, t) => e.tokenLength - t.tokenLength);
-		let m = u[0];
+		if (d.length === 0) throw Error("No codec candidates were produced");
+		d.sort((e, t) => e.tokenLength - t.tokenLength);
+		let m = d[0];
 		if (m.tokenLength > o) throw Error(`Encoded token exceeds maxLength (${m.tokenLength} > ${o})`);
 		return {
-			...D({
+			...O({
 				rawText: t,
 				transformedText: r,
 				tokenLength: m.tokenLength,
 				codecId: m.codec,
 				token: m.token
 			}),
-			candidates: u,
-			skipped: d
+			candidates: d,
+			skipped: f
 		};
 	}
 	async function b(e) {
 		return (await y(e)).token;
 	}
-	async function w(t, r = {}) {
-		let o = e(t, r), c = S(o);
-		if (c && c.version === s && a.has(c.codecId)) return await g(await a.get(c.codecId).client.decompress(c.payload), n, "decode");
-		if (c && (p || i.length > 1)) throw c.version === s ? Error(`Unsupported codec ${c.codecId}`) : Error(`Unsupported token version ${c.version}`);
-		if (p || i.length > 1) throw Error("Encoded token is missing a version/codec prefix");
-		return await g(await a.get(_).client.decompress(o), n, "decode");
+	async function x(t, r = {}) {
+		let o = e(t, r), c = C(o);
+		if (c && c.version === s && a.has(c.codecId)) return await _(await a.get(c.codecId).client.decompress(c.payload), n, "decode");
+		if (c && (l || i.length > 1)) throw c.version === s ? Error(`Unsupported codec ${c.codecId}`) : Error(`Unsupported token version ${c.version}`);
+		if (l || i.length > 1) throw Error("Encoded token is missing a version/codec prefix");
+		return await _(await a.get(m).client.decompress(o), n, "decode");
 	}
-	async function O(e, t, n = {}) {
+	async function T(e, t, n = {}) {
 		try {
-			return await w(e, n);
+			return await x(e, n);
 		} catch {
 			return t;
 		}
@@ -209,13 +212,13 @@ function O(t = {}) {
 		compress: b,
 		compressBest: y,
 		compressDetailed: y,
-		decompress: w,
-		tryDecompress: O,
-		tryDecodeToken: O,
+		decompress: x,
+		tryDecompress: T,
+		tryDecodeToken: T,
 		stats: y
 	};
 }
 //#endregion
-export { O as default };
+export { k as default };
 
 //# sourceMappingURL=web-share.js.map
