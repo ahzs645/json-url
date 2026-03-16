@@ -37,6 +37,73 @@ Although designed to work in Node, a standalone client-side library is provided 
 	);
 ```
 
+### Transforms
+
+You can now pass reversible object-level transforms before compression and after decompression. This is useful when you want to compact project-specific structures into portable primitive references before the codec runs.
+
+```
+	const JsonUrl = require('json-url');
+	const codec = JsonUrl('lzstring', {
+		transforms: [
+			{
+				id: 'asset-ref',
+				encode(value) {
+					if (!value.asset || !value.asset.embedded) return value;
+					return { ...value, asset: { ref: value.asset.id } };
+				},
+				decode(value) {
+					if (!value.asset || !value.asset.ref) return value;
+					return { ...value, asset: { id: value.asset.ref, embedded: 'resolved elsewhere' } };
+				}
+			}
+		]
+	});
+```
+
+### Multi-codec Engine
+
+When you want to test multiple codecs and keep the shortest token, use `createEngine`. Tokens are prefixed as `version.codec.payload`, so the engine can auto-detect the codec when decoding.
+
+```
+	const JsonUrl = require('json-url');
+
+	const engine = JsonUrl.createEngine({
+		codecs: ['lzma', 'lzstring', 'pack'],
+		transforms: [
+			{
+				id: 'compact-hotspot',
+				encode(value) {
+					if (!value.hotspot || !value.hotspot.embedded) return value;
+					return {
+						...value,
+						hotspot: {
+							mapRef: value.hotspot.id,
+							overrides: value.hotspot.overrides || {}
+						}
+					};
+				},
+				decode(value) {
+					if (!value.hotspot || !value.hotspot.mapRef) return value;
+					return {
+						...value,
+						hotspot: {
+							id: value.hotspot.mapRef,
+							overrides: value.hotspot.overrides || {}
+						}
+					};
+				}
+			}
+		],
+		maxLength: 12000
+	});
+
+	const result = await engine.compressDetailed(hugeJsonObject);
+	console.log(result.codec, result.token, result.candidates);
+
+	const token = await engine.compress(hugeJsonObject);
+	const original = await engine.decompress(token);
+```
+
 ### Standalone Browser Bundle
 
 ```
@@ -61,6 +128,7 @@ To see it in action, download the source code and run `npm run example`, or simp
 	* lzma
 	* lzstring - runs lzstring against a stringified JSON instead of using MessagePack on JSON
 	* pack - this just uses MessagePack and converts the binary buffer into a Base64 URL-safe representation, without any other compression
+* `JsonUrl.createEngine()` can test multiple codecs, apply reversible transforms, and emit self-describing `version.codec.payload` tokens.
 
 ## Motivation
 
