@@ -202,7 +202,7 @@ describe('json-url engine', () => {
 		const detailed = await engine.compressDetailed(decodedSample);
 		const decoded = await engine.decompress(detailed.token);
 
-		expect(engine.codecs).toEqual(['raw', 'gz', 'df', 'br', 'lz']);
+		expect(engine.codecs).toEqual(['raw', 'gz', 'df', 'zl', 'br', 'lz']);
 		expect(engine.version).toBe('1');
 		expect(engine.skipUnsupportedCodecs).toBe(true);
 		expect(detailed.token.startsWith('1.')).toBe(true);
