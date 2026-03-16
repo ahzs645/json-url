@@ -1,5 +1,5 @@
 import { t as e } from "./rolldown-runtime-CAFD8bLK.js";
-import { r as t, t as n } from "./stream-codec-Bx0Tud9V.js";
+import { r as t, t as n } from "./stream-codec-BflxNGHP.js";
 //#region src/main/codecs/br.ts
 var r = /* @__PURE__ */ e({ default: () => i }), i = {
 	pack: !1,
@@ -14,4 +14,4 @@ var r = /* @__PURE__ */ e({ default: () => i }), i = {
 //#endregion
 export { r as n, i as t };
 
-//# sourceMappingURL=br-DrSvobxd.js.map
+//# sourceMappingURL=br-BrCKoIOh.js.map

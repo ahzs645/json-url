@@ -1,5 +1,5 @@
 import { n as e, t } from "./decode-utils-BMvRxlTb.js";
-import { i as n, n as r } from "./stream-codec-Bx0Tud9V.js";
+import { i as n, n as r } from "./stream-codec-BflxNGHP.js";
 import { Buffer as i } from "buffer";
 //#region src/main/codecs/index.ts
 var a = {
@@ -8,10 +8,10 @@ var a = {
 	lzw: async () => (await import("./lzw-BhWZrokT.js")).default,
 	pack: async () => (await import("./pack-eK2uIy_a.js")).default,
 	raw: async () => (await import("./raw-DFCsiHFO.js").then((e) => e.n)).default,
-	gz: async () => (await import("./gz-iW3RIAMa.js").then((e) => e.n)).default,
-	df: async () => (await import("./df-C5_I-Tm4.js").then((e) => e.n)).default,
-	zl: async () => (await import("./zl-C5BQpHjN.js").then((e) => e.n)).default,
-	br: async () => (await import("./br-DrSvobxd.js").then((e) => e.n)).default,
+	gz: async () => (await import("./gz-B1g0x1Tf.js").then((e) => e.n)).default,
+	df: async () => (await import("./df-BND5OOZQ.js").then((e) => e.n)).default,
+	zl: async () => (await import("./zl-BMw-pZGg.js").then((e) => e.n)).default,
+	br: async () => (await import("./br-BrCKoIOh.js").then((e) => e.n)).default,
 	lz: async () => (await import("./lz-YJ-6p0Xx.js").then((e) => e.n)).default
 }, o = Object.freeze(Object.keys(a)), s = Object.freeze([
 	"raw",

@@ -50,16 +50,18 @@ async function a(e, t) {
 		return null;
 	}
 }
-function o(e, t, n) {
+var o = 6, s = 11;
+function c(e, t, n) {
+	let r = { level: o };
 	switch (t) {
-		case "gzip": return n.gzipSync(e);
-		case "deflate": return n.deflateSync(e);
-		case "deflate-raw": return n.deflateRawSync(e);
-		case "brotli": return typeof n.brotliCompressSync == "function" ? n.brotliCompressSync(e) : null;
+		case "gzip": return n.gzipSync(e, r);
+		case "deflate": return n.deflateSync(e, r);
+		case "deflate-raw": return n.deflateRawSync(e, r);
+		case "brotli": return typeof n.brotliCompressSync == "function" ? n.brotliCompressSync(e, { params: { [n.constants.BROTLI_PARAM_QUALITY]: s } }) : null;
 		default: return null;
 	}
 }
-function s(e, t, n) {
+function l(e, t, n) {
 	switch (t) {
 		case "gzip": return n.gunzipSync(e);
 		case "deflate": return n.inflateSync(e);
@@ -68,27 +70,27 @@ function s(e, t, n) {
 		default: return null;
 	}
 }
-async function c(e, n, a) {
-	let s = new TextEncoder().encode(e), c = await t.zlib();
-	if (c) {
-		let e = o(s, n, c);
+async function u(e, n, a) {
+	let o = new TextEncoder().encode(e), s = await t.zlib();
+	if (s) {
+		let e = c(o, n, s);
 		if (e) return e;
 	}
-	let l = await i(s, n);
+	let l = await i(o, n);
 	if (l) return l;
 	throw r(a, `Codec "${a}" is not supported in this environment.`);
 }
-async function l(e, n, i) {
-	let o = e, c = await t.zlib();
-	if (c) {
-		let e = s(o, n, c);
+async function d(e, n, i) {
+	let o = e, s = await t.zlib();
+	if (s) {
+		let e = l(o, n, s);
 		if (e) return new TextDecoder().decode(e);
 	}
-	let l = await a(o, n);
-	if (l) return new TextDecoder().decode(l);
+	let c = await a(o, n);
+	if (c) return new TextDecoder().decode(c);
 	throw r(i, `Codec "${i}" cannot be decoded in this environment.`);
 }
 //#endregion
-export { t as i, r as n, l as r, c as t };
+export { t as i, r as n, d as r, u as t };
 
-//# sourceMappingURL=stream-codec-Bx0Tud9V.js.map
+//# sourceMappingURL=stream-codec-BflxNGHP.js.map

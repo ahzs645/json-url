@@ -1,0 +1,2 @@
+const e=require(`./rolldown-runtime-DtFnurYI.cjs`),t=require(`./stream-codec-Bx0aR8hF.cjs`);var n=e.t({default:()=>r}),r={pack:!1,encode:!0,async compress(e){return t.t(String(e),`deflate`,`zl`)},async decompress(e){return t.r(typeof e==`string`?new TextEncoder().encode(e):e,`deflate`,`zl`)}};Object.defineProperty(exports,`n`,{enumerable:!0,get:function(){return n}}),Object.defineProperty(exports,`t`,{enumerable:!0,get:function(){return r}});
+//# sourceMappingURL=zl-1x6FKpnm.cjs.map

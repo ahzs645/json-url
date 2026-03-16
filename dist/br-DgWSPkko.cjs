@@ -1,0 +1,2 @@
+const e=require(`./rolldown-runtime-DtFnurYI.cjs`),t=require(`./stream-codec-Bx0aR8hF.cjs`);var n=e.t({default:()=>r}),r={pack:!1,encode:!0,async compress(e){return t.t(String(e),`brotli`,`br`)},async decompress(e){return t.r(typeof e==`string`?new TextEncoder().encode(e):e,`brotli`,`br`)}};Object.defineProperty(exports,`n`,{enumerable:!0,get:function(){return n}}),Object.defineProperty(exports,`t`,{enumerable:!0,get:function(){return r}});
+//# sourceMappingURL=br-DgWSPkko.cjs.map

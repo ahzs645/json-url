@@ -72,21 +72,29 @@ async function decompressWithStreams(
 	}
 }
 
+// Level 6 matches level 9 output for typical JSON payloads while being faster.
+// Brotli quality 11 is worth the cost — it's where the biggest compression gains are.
+const DEFLATE_LEVEL = 6;
+const BROTLI_QUALITY = 11;
+
 function compressWithNodeZlib(
 	input: Uint8Array,
 	format: StreamCodecFormat,
 	zlib: typeof import('node:zlib')
 ): Buffer | null {
+	const deflateOpts = { level: DEFLATE_LEVEL };
 	switch (format) {
 	case 'gzip':
-		return zlib.gzipSync(input);
+		return zlib.gzipSync(input, deflateOpts);
 	case 'deflate':
-		return zlib.deflateSync(input);
+		return zlib.deflateSync(input, deflateOpts);
 	case 'deflate-raw':
-		return zlib.deflateRawSync(input);
+		return zlib.deflateRawSync(input, deflateOpts);
 	case 'brotli':
 		if (typeof zlib.brotliCompressSync !== 'function') return null;
-		return zlib.brotliCompressSync(input);
+		return zlib.brotliCompressSync(input, {
+			params: { [zlib.constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY }
+		});
 	default:
 		return null;
 	}
