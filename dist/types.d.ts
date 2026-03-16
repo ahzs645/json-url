@@ -56,6 +56,7 @@ export interface CreateEngineOptions extends CreateNamedCodecOptions {
     alwaysPrefix?: boolean;
     skipUnsupportedCodecs?: boolean;
     defaultCodec?: string;
+    plainTextThreshold?: number;
 }
 export interface NamedCodecClient<TValue = JsonUrlValue> {
     id: string;
@@ -70,7 +71,9 @@ export interface EngineClient<TValue = JsonUrlValue> {
     codecs: string[];
     transforms: string[];
     skipUnsupportedCodecs: boolean;
+    plainTextThreshold: number;
     compress(value: TValue): Promise<string>;
+    compressConditional(value: TValue): Promise<string | null>;
     compressBest(value: TValue): Promise<EngineCompressResult>;
     compressDetailed(value: TValue): Promise<EngineCompressResult>;
     decompress(token: string, options?: DecodeOptions): Promise<TValue>;

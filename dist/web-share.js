@@ -134,12 +134,12 @@ function O({ rawText: e, transformedText: t, tokenLength: n, codecId: r, token: 
 	};
 }
 function k(t = {}) {
-	let n = g(t.transforms), r = n.map((e) => e.id), i = (Array.isArray(t.codecs) && t.codecs.length > 0 ? t.codecs : Array.from(u)).map((e, t) => E(e, t)), a = /* @__PURE__ */ new Map(), o = w(t.maxLength === void 0 ? f : t.maxLength), s = t.version === void 0 ? d : h(String(t.version), "version"), c = t.skipUnsupportedCodecs === void 0 ? !0 : t.skipUnsupportedCodecs === !0, l = t.alwaysPrefix === void 0 ? !0 : t.alwaysPrefix, m = t.defaultCodec === void 0 ? i[0]?.id : h(t.defaultCodec, "default codec");
+	let n = g(t.transforms), r = n.map((e) => e.id), i = (Array.isArray(t.codecs) && t.codecs.length > 0 ? t.codecs : Array.from(u)).map((e, t) => E(e, t)), a = /* @__PURE__ */ new Map(), o = w(t.maxLength === void 0 ? f : t.maxLength), s = t.version === void 0 ? d : h(String(t.version), "version"), c = t.skipUnsupportedCodecs === void 0 ? !0 : t.skipUnsupportedCodecs === !0, l = typeof t.plainTextThreshold == "number" && Number.isFinite(t.plainTextThreshold) && t.plainTextThreshold > 0 ? Math.floor(t.plainTextThreshold) : 0, m = t.alwaysPrefix === void 0 ? !0 : t.alwaysPrefix, v = t.defaultCodec === void 0 ? i[0]?.id : h(t.defaultCodec, "default codec");
 	if (i.forEach((e) => {
 		if (a.has(e.id)) throw Error(`Duplicate codec id "${e.id}"`);
 		a.set(e.id, e);
-	}), !m || !a.has(m)) throw Error(`Unknown default codec "${m}"`);
-	async function v(e) {
+	}), !v || !a.has(v)) throw Error(`Unknown default codec "${v}"`);
+	async function y(e) {
 		let t = await _(e, n, "encode");
 		return {
 			rawText: JSON.stringify(e),
@@ -147,13 +147,13 @@ function k(t = {}) {
 			transformedText: JSON.stringify(t)
 		};
 	}
-	async function y(e) {
-		let { rawText: t, transformed: n, transformedText: r } = await v(e), a = encodeURIComponent(t).length, u = encodeURIComponent(r).length, d = [], f = [];
+	async function b(e) {
+		let { rawText: t, transformed: n, transformedText: r } = await y(e), a = encodeURIComponent(t).length, l = encodeURIComponent(r).length, u = [], d = [];
 		for (let e of i) try {
 			let i = await e.client.compress(n);
 			if (typeof i != "string") throw Error(`Codec "${e.id}" returned a non-string token`);
-			let o = l ? S(s, e.id, i) : i;
-			d.push({
+			let o = m ? S(s, e.id, i) : i;
+			u.push({
 				codec: e.id,
 				token: o,
 				tokenLength: o.length,
@@ -161,45 +161,52 @@ function k(t = {}) {
 				raw: t.length,
 				rawencoded: a,
 				transformed: r.length,
-				transformedencoded: u,
+				transformedencoded: l,
 				compression: p(a / o.length)
 			});
 		} catch (t) {
 			if (!c || !D(t)) throw t;
-			f.push({
+			d.push({
 				codec: e.id,
 				reason: t.message
 			});
 		}
-		if (d.length === 0) throw Error("No codec candidates were produced");
-		d.sort((e, t) => e.tokenLength - t.tokenLength);
-		let m = d[0];
-		if (m.tokenLength > o) throw Error(`Encoded token exceeds maxLength (${m.tokenLength} > ${o})`);
+		if (u.length === 0) throw Error("No codec candidates were produced");
+		u.sort((e, t) => e.tokenLength - t.tokenLength);
+		let f = u[0];
+		if (f.tokenLength > o) throw Error(`Encoded token exceeds maxLength (${f.tokenLength} > ${o})`);
 		return {
 			...O({
 				rawText: t,
 				transformedText: r,
-				tokenLength: m.tokenLength,
-				codecId: m.codec,
-				token: m.token
+				tokenLength: f.tokenLength,
+				codecId: f.codec,
+				token: f.token
 			}),
-			candidates: d,
-			skipped: f
+			candidates: u,
+			skipped: d
 		};
 	}
-	async function b(e) {
-		return (await y(e)).token;
+	async function x(e) {
+		return (await b(e)).token;
 	}
-	async function x(t, r = {}) {
+	async function T(e) {
+		if (l > 0) {
+			let t = JSON.stringify(e);
+			if (encodeURIComponent(t).length <= l) return null;
+		}
+		return x(e);
+	}
+	async function k(t, r = {}) {
 		let o = e(t, r), c = C(o);
 		if (c && c.version === s && a.has(c.codecId)) return await _(await a.get(c.codecId).client.decompress(c.payload), n, "decode");
-		if (c && (l || i.length > 1)) throw c.version === s ? Error(`Unsupported codec ${c.codecId}`) : Error(`Unsupported token version ${c.version}`);
-		if (l || i.length > 1) throw Error("Encoded token is missing a version/codec prefix");
-		return await _(await a.get(m).client.decompress(o), n, "decode");
+		if (c && (m || i.length > 1)) throw c.version === s ? Error(`Unsupported codec ${c.codecId}`) : Error(`Unsupported token version ${c.version}`);
+		if (m || i.length > 1) throw Error("Encoded token is missing a version/codec prefix");
+		return await _(await a.get(v).client.decompress(o), n, "decode");
 	}
-	async function T(e, t, n = {}) {
+	async function A(e, t, n = {}) {
 		try {
-			return await x(e, n);
+			return await k(e, n);
 		} catch {
 			return t;
 		}
@@ -209,13 +216,15 @@ function k(t = {}) {
 		codecs: i.map((e) => e.id),
 		transforms: r,
 		skipUnsupportedCodecs: c,
-		compress: b,
-		compressBest: y,
-		compressDetailed: y,
-		decompress: x,
-		tryDecompress: T,
-		tryDecodeToken: T,
-		stats: y
+		plainTextThreshold: l,
+		compress: x,
+		compressConditional: T,
+		compressBest: b,
+		compressDetailed: b,
+		decompress: k,
+		tryDecompress: A,
+		tryDecodeToken: A,
+		stats: b
 	};
 }
 //#endregion

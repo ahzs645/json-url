@@ -295,6 +295,10 @@ function createWebShareEngine<TValue = JsonUrlValue>(
 		typeof options.skipUnsupportedCodecs === 'undefined'
 			? true
 			: options.skipUnsupportedCodecs === true;
+	const plainTextThreshold =
+		typeof options.plainTextThreshold === 'number' && Number.isFinite(options.plainTextThreshold) && options.plainTextThreshold > 0
+			? Math.floor(options.plainTextThreshold)
+			: 0;
 	const alwaysPrefix =
 		typeof options.alwaysPrefix === 'undefined' ? true : options.alwaysPrefix;
 	const defaultCodec =
@@ -389,6 +393,17 @@ function createWebShareEngine<TValue = JsonUrlValue>(
 		return result.token;
 	}
 
+	async function compressConditional(json: TValue): Promise<string | null> {
+		if (plainTextThreshold > 0) {
+			const rawText = JSON.stringify(json);
+			const rawencoded = encodeURIComponent(rawText).length;
+			if (rawencoded <= plainTextThreshold) {
+				return null;
+			}
+		}
+		return compress(json);
+	}
+
 	async function decompress(token: string, options = {}): Promise<TValue> {
 		const normalized = prepareEncodedInput(token, options);
 		const parsed = parseToken(normalized);
@@ -426,7 +441,9 @@ function createWebShareEngine<TValue = JsonUrlValue>(
 		codecs: codecEntries.map((entry) => entry.id),
 		transforms: transformIds,
 		skipUnsupportedCodecs,
+		plainTextThreshold,
 		compress,
+		compressConditional,
 		compressBest: compressDetailed,
 		compressDetailed,
 		decompress,

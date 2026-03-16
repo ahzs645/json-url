@@ -175,12 +175,12 @@ function T(t, n = {}) {
 	};
 }
 function E(t = {}) {
-	let n = f(t.transforms), i = n.map((e) => e.id), a = (Array.isArray(t.codecs) && t.codecs.length > 0 ? t.codecs : o).map((e, t) => C(e, t)), s = /* @__PURE__ */ new Map(), c = x(t.maxLength), u = t.version === void 0 ? "1" : d(String(t.version), "version"), m = t.skipUnsupportedCodecs === !0, h = typeof t.alwaysPrefix == "boolean" ? t.alwaysPrefix : a.length !== 1, g = t.defaultCodec === void 0 ? a[0]?.id : d(t.defaultCodec, "default codec");
+	let n = f(t.transforms), i = n.map((e) => e.id), a = (Array.isArray(t.codecs) && t.codecs.length > 0 ? t.codecs : o).map((e, t) => C(e, t)), s = /* @__PURE__ */ new Map(), c = x(t.maxLength), u = t.version === void 0 ? "1" : d(String(t.version), "version"), m = t.skipUnsupportedCodecs === !0, h = typeof t.plainTextThreshold == "number" && Number.isFinite(t.plainTextThreshold) && t.plainTextThreshold > 0 ? Math.floor(t.plainTextThreshold) : 0, g = typeof t.alwaysPrefix == "boolean" ? t.alwaysPrefix : a.length !== 1, _ = t.defaultCodec === void 0 ? a[0]?.id : d(t.defaultCodec, "default codec");
 	if (a.forEach((e) => {
 		if (s.has(e.id)) throw Error(`Duplicate codec id "${e.id}"`);
 		s.set(e.id, e);
-	}), !g || !s.has(g)) throw Error(`Unknown default codec "${g}"`);
-	async function _(e) {
+	}), !_ || !s.has(_)) throw Error(`Unknown default codec "${_}"`);
+	async function v(e) {
 		let t = await p(e, n, "encode");
 		return {
 			rawText: JSON.stringify(e),
@@ -188,12 +188,12 @@ function E(t = {}) {
 			transformedText: JSON.stringify(t)
 		};
 	}
-	async function v(e) {
-		let { rawText: t, transformed: n, transformedText: i } = await _(e), o = encodeURIComponent(t).length, s = encodeURIComponent(i).length, d = [], f = [];
+	async function S(e) {
+		let { rawText: t, transformed: n, transformedText: i } = await v(e), o = encodeURIComponent(t).length, s = encodeURIComponent(i).length, d = [], f = [];
 		for (let e of a) try {
 			let r = await e.client.compress(n);
 			if (typeof r != "string") throw Error(`Codec "${e.id}" returned a non-string token`);
-			let a = h ? y(u, e.id, r) : r;
+			let a = g ? y(u, e.id, r) : r;
 			d.push({
 				codec: e.id,
 				token: a,
@@ -229,38 +229,47 @@ function E(t = {}) {
 			skipped: f
 		};
 	}
-	async function S(e) {
-		return (await v(e)).token;
+	async function T(e) {
+		return (await S(e)).token;
 	}
-	async function T(t, r = {}) {
+	async function E(e) {
+		if (h > 0) {
+			let t = JSON.stringify(e);
+			if (encodeURIComponent(t).length <= h) return null;
+		}
+		return T(e);
+	}
+	async function D(t, r = {}) {
 		let i = e(t, r), o = b(i);
 		if (o && o.version === u && s.has(o.codecId)) return await p(await s.get(o.codecId).client.decompress(o.payload), n, "decode");
-		if (o && (h || a.length > 1)) throw o.version === u ? Error(`Unsupported codec ${o.codecId}`) : Error(`Unsupported token version ${o.version}`);
-		if (h || a.length > 1) throw Error("Encoded token is missing a version/codec prefix");
-		return await p(await s.get(g).client.decompress(i), n, "decode");
+		if (o && (g || a.length > 1)) throw o.version === u ? Error(`Unsupported codec ${o.codecId}`) : Error(`Unsupported token version ${o.version}`);
+		if (g || a.length > 1) throw Error("Encoded token is missing a version/codec prefix");
+		return await p(await s.get(_).client.decompress(i), n, "decode");
 	}
-	async function E(e, t, n = {}) {
+	async function O(e, t, n = {}) {
 		try {
-			return await T(e, n);
+			return await D(e, n);
 		} catch {
 			return t;
 		}
 	}
-	async function D(e) {
-		return v(e);
+	async function k(e) {
+		return S(e);
 	}
 	return {
 		version: u,
 		codecs: a.map((e) => e.id),
 		transforms: i,
 		skipUnsupportedCodecs: m,
-		compress: S,
-		compressBest: v,
-		compressDetailed: v,
-		decompress: T,
-		tryDecompress: E,
-		tryDecodeToken: E,
-		stats: D
+		plainTextThreshold: h,
+		compress: T,
+		compressConditional: E,
+		compressBest: S,
+		compressDetailed: S,
+		decompress: D,
+		tryDecompress: O,
+		tryDecodeToken: O,
+		stats: k
 	};
 }
 function D(e = {}) {

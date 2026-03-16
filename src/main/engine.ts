@@ -354,6 +354,10 @@ export function createEngine<TValue = JsonUrlValue>(
 			? '1'
 			: normalizeCodecId(String(options.version), 'version');
 	const skipUnsupportedCodecs = options.skipUnsupportedCodecs === true;
+	const plainTextThreshold =
+		typeof options.plainTextThreshold === 'number' && Number.isFinite(options.plainTextThreshold) && options.plainTextThreshold > 0
+			? Math.floor(options.plainTextThreshold)
+			: 0;
 	const alwaysPrefix =
 		typeof options.alwaysPrefix === 'boolean'
 			? options.alwaysPrefix
@@ -459,6 +463,17 @@ export function createEngine<TValue = JsonUrlValue>(
 		return result.token;
 	}
 
+	async function compressConditional(json: TValue): Promise<string | null> {
+		if (plainTextThreshold > 0) {
+			const rawText = JSON.stringify(json);
+			const rawencoded = encodeURIComponent(rawText).length;
+			if (rawencoded <= plainTextThreshold) {
+				return null;
+			}
+		}
+		return compress(json);
+	}
+
 	async function decompress(token: string, options = {}): Promise<TValue> {
 		const normalized = prepareEncodedInput(token, options);
 		const parsed = parseToken(normalized);
@@ -504,7 +519,9 @@ export function createEngine<TValue = JsonUrlValue>(
 		codecs: codecEntries.map((entry) => entry.id),
 		transforms: transformIds,
 		skipUnsupportedCodecs,
+		plainTextThreshold,
 		compress,
+		compressConditional,
 		compressBest: compressDetailed,
 		compressDetailed,
 		decompress,
