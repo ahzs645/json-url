@@ -33,6 +33,12 @@ export default defineConfig({
 	},
 	test: {
 		environment: 'node',
-		include: ['test/**/*.test.ts']
+		include: ['test/**/*.test.ts'],
+		coverage: {
+			provider: 'v8',
+			reporter: ['text', 'lcov', 'json-summary'],
+			include: ['src/main/**/*.ts'],
+			exclude: ['src/main/external-modules.d.ts', 'src/main/browser.ts']
+		}
 	}
 });

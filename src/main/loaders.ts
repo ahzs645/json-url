@@ -63,12 +63,9 @@ const LOADERS: LoaderMap = {
 			return resolveDefaultExport(module as typeof import('node:zlib'));
 		} catch {
 			try {
-				const dynamicRequire = new Function(
-					'return typeof require !== "undefined" ? require : null'
-				) as () => ((specifier: string) => typeof import('node:zlib')) | null;
-				const requireFn = dynamicRequire();
+				const requireFn = typeof require !== 'undefined' ? require : null;
 				if (!requireFn) return null;
-				return requireFn('zlib');
+				return requireFn('zlib') as typeof import('node:zlib');
 			} catch {
 				return null;
 			}
