@@ -79,7 +79,7 @@ When you want to test multiple codecs and keep the shortest token, use `createEn
 	const JsonUrl = require('json-url');
 
 	const engine = JsonUrl.createEngine({
-		codecs: ['lzma', 'lzstring', 'pack'],
+		codecs: ['hbr', 'br', 'hgz', 'gz', 'lzstring'],
 		transforms: [
 			{
 				id: 'compact-hotspot',
@@ -182,8 +182,10 @@ To see it in action, download the source code and run `npm run example`, or simp
 	* pack - this just uses MessagePack and converts the binary buffer into a Base64 URL-safe representation, without any other compression
 	* raw - Base64URL encoded UTF-8 JSON bytes
 	* gz - gzip via `CompressionStream` with environment fallback
+	* hgz - gzip with safe homogeneous-array prepacking for repeated object rows
 	* df - deflate-raw via `CompressionStream` with environment fallback
 	* br - brotli via `CompressionStream` with environment fallback
+	* hbr - brotli with safe homogeneous-array prepacking for repeated object rows
 	* lz - `compressToEncodedURIComponent` / `decompressFromEncodedURIComponent`
 * `JsonUrl.createEngine()` can test multiple codecs, apply reversible transforms, and emit self-describing `version.codec.payload` tokens.
 * `JsonUrl.createWebShareEngine()` is a preset for `raw/gz/df/br/lz` with `version: "1"` and `maxLength: 12000`.

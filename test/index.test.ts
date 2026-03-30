@@ -137,6 +137,8 @@ describe('json-url', () => {
 describe('json-url engine', () => {
 	it('exposes engine helpers on the default export', () => {
 		expect(Array.isArray(createClient.availableCodecs)).toBe(true);
+		expect(createClient.availableCodecs).toContain('hgz');
+		expect(createClient.availableCodecs).toContain('hbr');
 		expect(typeof createClient.createEngine).toBe('function');
 		expect(typeof createClient.createNamedCodec).toBe('function');
 		expect(typeof createClient.createWebShareEngine).toBe('function');
@@ -315,5 +317,89 @@ describe('json-url engine', () => {
 		const decoded = await engine.tryDecodeToken('%7Bbad', { fallback: true }, { deURI: true });
 
 		expect(decoded).toEqual({ fallback: true });
+	});
+});
+
+describe('homogeneous codecs', () => {
+	for (const algorithm of ['hgz', 'hbr'] as const) {
+		it(`round-trips homogeneous object arrays with ${algorithm}`, async () => {
+			const codec = createClient(algorithm);
+			const sample = Array.from({ length: 60 }, (_, index) => ({
+				id: index,
+				label: `Item ${index}`,
+				active: index % 2 === 0,
+				nested: {
+					fields: Array.from({ length: 3 }, (__, childIndex) => ({
+						name: `field-${childIndex}`,
+						value: `${index}-${childIndex}`
+					}))
+				}
+			}));
+
+			const compressed = await codec.compress(sample);
+			const decompressed = await codec.decompress(compressed);
+
+			expect(validate(compressed)).toBe(true);
+			expect(decompressed).toEqual(sample);
+		});
+
+		it(`does not corrupt heterogeneous arrays with ${algorithm}`, async () => {
+			const codec = createClient(algorithm);
+			const sample = {
+				rows: [{ a: 1, b: 2 }, { a: 3, c: 5 }],
+				mixed: [{ a: 1 }, 2, { a: 3 }],
+				primitives: [1, 2, 3],
+				oneItem: [{ only: true }],
+				zeroKeyRows: Array.from({ length: 5 }, () => ({}))
+			};
+
+			const compressed = await codec.compress(sample);
+			const decompressed = await codec.decompress(compressed);
+
+			expect(decompressed).toEqual(sample);
+		});
+
+		it(`supports keys containing dots or slashes with ${algorithm}`, async () => {
+			const codec = createClient(algorithm);
+			const sample = {
+				'field.with.dot': [
+					{
+						'value/one': [
+							{ 'nested.key': 'a', 'nested/slash': 1 },
+							{ 'nested.key': 'b', 'nested/slash': 2 }
+						]
+					},
+					{
+						'value/one': [
+							{ 'nested.key': 'c', 'nested/slash': 3 },
+							{ 'nested.key': 'd', 'nested/slash': 4 }
+						]
+					}
+				]
+			};
+
+			const compressed = await codec.compress(sample);
+			const decompressed = await codec.decompress(compressed);
+
+			expect(decompressed).toEqual(sample);
+		});
+	}
+
+	it('lets the engine prefer hgz over gz when packing helps', async () => {
+		const engine = createClient.createEngine({
+			codecs: ['gz', 'hgz']
+		});
+		const sample = Array.from({ length: 100 }, (_, index) => ({
+			id: index,
+			name: `item-${index}`,
+			active: index % 2 === 0,
+			tags: ['a', 'b', 'c']
+		}));
+
+		const detailed = await engine.compressDetailed(sample);
+		const decompressed = await engine.decompress(detailed.token);
+
+		expect(detailed.codec).toBe('hgz');
+		expect(decompressed).toEqual(sample);
 	});
 });
