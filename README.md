@@ -1,6 +1,6 @@
 # json-url
 
-[![npm downloads][downloads-image]][downloads-url] [![Build Status][travis-image]][travis-url] [![Dependency Status][daviddm-image]][daviddm-url] [![Coverage Status][coverage-image]][coverage-url]
+[![npm downloads][downloads-image]][downloads-url] [![CI][ci-image]][ci-url]
 
 Generate URL-safe representations of some arbtirary JSON data in as small a space as possible that can be shared in a bookmark / link.
 
@@ -238,11 +238,7 @@ Find a way to improve bundle sizes for browser usage.
 [5]: http://pieroxy.net/blog/pages/lz-string/index.html
 [6]: https://github.com/pieroxy/lz-string/blob/master/libs/lz-string.js#L15
 
-[downloads-image]: https://img.shields.io/npm/dm/json-url.svg?style=flat-square
-[downloads-url]: https://www.npmjs.com/package/json-url
-[travis-image]: https://travis-ci.org/masotime/json-url.svg?bxeranch=master
-[travis-url]: https://travis-ci.org/masotime/json-url
-[daviddm-image]: https://david-dm.org/masotime/json-url.svg?theme=shields.io
-[daviddm-url]: https://david-dm.org/masotime/json-url
-[coverage-image]: https://coveralls.io/repos/github/masotime/json-url/badge.svg?branch=master
-[coverage-url]: https://coveralls.io/github/masotime/json-url?branch=master
+[downloads-image]: https://img.shields.io/npm/dm/@firstform/json-url.svg?style=flat-square
+[downloads-url]: https://www.npmjs.com/package/@firstform/json-url
+[ci-image]: https://github.com/ahzs645/json-url/actions/workflows/ci.yml/badge.svg
+[ci-url]: https://github.com/ahzs645/json-url/actions/workflows/ci.yml

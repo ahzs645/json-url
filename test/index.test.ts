@@ -4,6 +4,106 @@ import { validate } from 'urlsafe-base64';
 import createClient from '../src/main/index.js';
 import samples from './samples.json';
 
+describe('edge cases', () => {
+	const algorithms = ['pack', 'lzw', 'lzma', 'lzstring'] as const;
+
+	it('handles an empty object', async () => {
+		for (const alg of algorithms) {
+			const client = createClient(alg);
+			const compressed = await client.compress({});
+			const decompressed = await client.decompress(compressed);
+			expect(decompressed).toEqual({});
+		}
+	});
+
+	it('handles an empty array', async () => {
+		for (const alg of algorithms) {
+			const client = createClient(alg);
+			const compressed = await client.compress([]);
+			const decompressed = await client.decompress(compressed);
+			expect(decompressed).toEqual([]);
+		}
+	});
+
+	it('handles deeply nested objects', async () => {
+		let nested: Record<string, unknown> = { value: 'leaf' };
+		for (let i = 0; i < 20; i++) {
+			nested = { child: nested };
+		}
+		for (const alg of algorithms) {
+			const client = createClient(alg);
+			const compressed = await client.compress(nested);
+			const decompressed = await client.decompress(compressed);
+			expect(decompressed).toEqual(nested);
+		}
+	});
+
+	it('handles special Unicode characters', async () => {
+		const data = {
+			emoji: '\u{1F600}\u{1F680}\u{1F30D}',
+			cjk: '\u4F60\u597D\u4E16\u754C',
+			arabic: '\u0645\u0631\u062D\u0628\u0627',
+			mixed: 'hello \u4E16\u754C \u{1F600}'
+		};
+		for (const alg of algorithms) {
+			const client = createClient(alg);
+			const compressed = await client.compress(data);
+			const decompressed = await client.decompress(compressed);
+			expect(decompressed).toEqual(data);
+		}
+	});
+
+	it('handles values with special JSON types', async () => {
+		const data = {
+			nullValue: null,
+			boolTrue: true,
+			boolFalse: false,
+			zero: 0,
+			negative: -42,
+			float: 3.14159,
+			emptyString: '',
+			emptyArray: [],
+			emptyObject: {}
+		};
+		for (const alg of algorithms) {
+			const client = createClient(alg);
+			const compressed = await client.compress(data);
+			const decompressed = await client.decompress(compressed);
+			expect(decompressed).toEqual(data);
+		}
+	});
+
+	it('handles a large payload', async () => {
+		const largeArray = Array.from({ length: 500 }, (_, i) => ({
+			id: i,
+			name: `item-${i}`,
+			active: i % 2 === 0
+		}));
+		for (const alg of algorithms) {
+			const client = createClient(alg);
+			const compressed = await client.compress(largeArray);
+			const decompressed = await client.decompress(compressed);
+			expect(decompressed).toEqual(largeArray);
+		}
+	});
+
+	it('handles strings with URL-unsafe characters', async () => {
+		const data = {
+			url: 'https://example.com/path?q=hello+world&foo=bar#section',
+			encoded: '%20%3D%26',
+			slashes: '////',
+			plus: 'a+b+c'
+		};
+		for (const alg of algorithms) {
+			const client = createClient(alg);
+			const compressed = await client.compress(data);
+			expect(validate(compressed)).toBe(true);
+			const decompressed = await client.decompress(compressed);
+			expect(decompressed).toEqual(data);
+		}
+	});
+});
+
 describe('json-url', () => {
 	for (const sample of samples) {
 		describe(`When attempting to compress ${JSON.stringify(sample).slice(0, 50)}...`, () => {
