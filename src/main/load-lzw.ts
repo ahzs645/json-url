@@ -1,10 +1,12 @@
 import type lzwModule from 'node-lzw';
 
-function resolveDefaultExport<T>(module: T | { default: T }): T {
-	return (module as { default?: T }).default || (module as T);
-}
+import { resolveDefaultExport } from './resolve-default-export.js';
 
-export async function loadLzw(): Promise<typeof lzwModule> {
-	const module = await import('node-lzw');
-	return resolveDefaultExport<typeof lzwModule>(module);
+let cached: Promise<typeof lzwModule> | null = null;
+
+export function loadLzw(): Promise<typeof lzwModule> {
+	cached ??= import('node-lzw').then((module) =>
+		resolveDefaultExport<typeof lzwModule>(module)
+	);
+	return cached;
 }

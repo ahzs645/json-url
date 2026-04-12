@@ -1,7 +1,9 @@
+import { Buffer } from 'buffer';
 import { describe, expect, it } from 'vitest';
 import { validate } from 'urlsafe-base64';
 
 import createClient from '../src/main/index.js';
+import { cleanEncodedInput } from '../src/main/decode-utils.js';
 import samples from './samples.json';
 
 describe('edge cases', () => {
@@ -400,6 +402,233 @@ describe('homogeneous codecs', () => {
 		const decompressed = await engine.decompress(detailed.token);
 
 		expect(detailed.codec).toBe('hgz');
+		expect(decompressed).toEqual(sample);
+	});
+});
+
+describe('cleanEncodedInput', () => {
+	it('strips whitespace characters', () => {
+		expect(cleanEncodedInput(' hello ')).toBe('hello');
+		expect(cleanEncodedInput('\nhello\r')).toBe('hello');
+		expect(cleanEncodedInput('\0hello\0')).toBe('hello');
+	});
+
+	it('strips unicode line/paragraph separators', () => {
+		expect(cleanEncodedInput('\u2028hello\u2029')).toBe('hello');
+	});
+
+	it('decodes percent-encoded segments and strips resulting whitespace', () => {
+		expect(cleanEncodedInput('hello%20world')).toBe('helloworld');
+		expect(cleanEncodedInput('hello%2Dworld')).toBe('hello-world');
+	});
+
+	it('handles multiple percent-encoded segments efficiently', () => {
+		expect(cleanEncodedInput('%48%65%6C%6C%6F')).toBe('Hello');
+	});
+
+	it('handles mixed percent-encoding and whitespace', () => {
+		expect(cleanEncodedInput(' %48ello \n')).toBe('Hello');
+		expect(cleanEncodedInput('%61%62%63')).toBe('abc');
+	});
+
+	it('returns the input unchanged when clean', () => {
+		expect(cleanEncodedInput('abc123')).toBe('abc123');
+	});
+});
+
+describe('error paths', () => {
+	it('throws on invalid codec algorithm', () => {
+		expect(() => createClient('nonexistent')).toThrow('No such algorithm');
+	});
+
+	it('throws on empty token for decompress', async () => {
+		const codec = createClient('raw');
+		await expect(codec.decompress('')).rejects.toThrow();
+	});
+
+	it('throws on unsupported token version in engine decompress', async () => {
+		const engine = createClient.createWebShareEngine();
+		await expect(engine.decompress('99.gz.payload')).rejects.toThrow(/Unsupported token version/);
+	});
+
+	it('throws on unsupported codec in engine decompress', async () => {
+		const engine = createClient.createWebShareEngine();
+		await expect(engine.decompress('1.nonexistent.payload')).rejects.toThrow(/Unsupported codec/);
+	});
+
+	it('throws on duplicate codec ids in engine', () => {
+		expect(() =>
+			createClient.createEngine({ codecs: ['gz', 'gz'] })
+		).toThrow(/Duplicate codec id/);
+	});
+
+	it('throws on invalid maxLength', () => {
+		expect(() =>
+			createClient.createEngine({ codecs: ['raw'], maxLength: -1 })
+		).toThrow(/positive finite number/);
+	});
+
+	it('throws when encoded token exceeds maxLength', async () => {
+		const engine = createClient.createEngine({
+			codecs: ['raw'],
+			maxLength: 5
+		});
+		await expect(engine.compress({ key: 'value' })).rejects.toThrow(/exceeds maxLength/);
+	});
+});
+
+describe('compressConditional and plainTextThreshold', () => {
+	it('returns null when raw encoded size is within threshold', async () => {
+		const engine = createClient.createEngine({
+			codecs: ['raw'],
+			plainTextThreshold: 100000
+		});
+		const result = await engine.compressConditional({ small: true });
+		expect(result).toBeNull();
+	});
+
+	it('compresses when raw encoded size exceeds threshold', async () => {
+		const engine = createClient.createEngine({
+			codecs: ['raw'],
+			plainTextThreshold: 5
+		});
+		const result = await engine.compressConditional({ data: 'this is a longer payload' });
+		expect(result).not.toBeNull();
+		expect(typeof result).toBe('string');
+	});
+
+	it('always compresses when plainTextThreshold is not set', async () => {
+		const engine = createClient.createEngine({ codecs: ['raw'] });
+		const result = await engine.compressConditional({ tiny: 1 });
+		expect(result).not.toBeNull();
+	});
+});
+
+describe('zl (deflate) codec', () => {
+	it('round-trips data with the zl codec', async () => {
+		const codec = createClient('zl');
+		const sample = { deflate: true, nested: { values: [1, 2, 3] } };
+		const compressed = await codec.compress(sample);
+		const decompressed = await codec.decompress(compressed);
+
+		expect(validate(compressed)).toBe(true);
+		expect(decompressed).toEqual(sample);
+	});
+
+	it('produces stats for the zl codec', async () => {
+		const codec = createClient('zl');
+		const stats = await codec.stats({ test: 'value' });
+
+		expect(stats.rawencoded).toBeTruthy();
+		expect(stats.compressedencoded).toBeTruthy();
+		expect(stats.compression).toBeTruthy();
+		expect(stats.algorithm).toBe('zl');
+	});
+});
+
+describe('maxDecompressedSize guard', () => {
+	it('rejects decompressed payloads exceeding the limit for named codec', async () => {
+		const codec = createClient('raw', { maxDecompressedSize: 10 });
+		const largePayload = { data: 'this string is definitely longer than 10 bytes' };
+		const compressed = await codec.compress(largePayload);
+
+		await expect(codec.decompress(compressed)).rejects.toThrow(/exceeds maxDecompressedSize/);
+	});
+
+	it('allows decompressed payloads within the limit for named codec', async () => {
+		const codec = createClient('raw', { maxDecompressedSize: 100000 });
+		const sample = { ok: true };
+		const compressed = await codec.compress(sample);
+		const decompressed = await codec.decompress(compressed);
+
+		expect(decompressed).toEqual(sample);
+	});
+
+	it('rejects decompressed payloads exceeding the limit for engine', async () => {
+		const engine = createClient.createEngine({
+			codecs: ['raw'],
+			maxDecompressedSize: 10
+		});
+		const largePayload = { data: 'this is too large for the limit' };
+		const compressed = await engine.compress(largePayload);
+
+		await expect(engine.decompress(compressed)).rejects.toThrow(/exceeds maxDecompressedSize/);
+	});
+
+	it('allows decompressed payloads within the limit for engine', async () => {
+		const engine = createClient.createEngine({
+			codecs: ['raw'],
+			maxDecompressedSize: 100000
+		});
+		const sample = { ok: true };
+		const compressed = await engine.compress(sample);
+		const decompressed = await engine.decompress(compressed);
+
+		expect(decompressed).toEqual(sample);
+	});
+
+	it('returns fallback via tryDecompress when size limit exceeded', async () => {
+		const codec = createClient<{ fallback: boolean }>('raw', { maxDecompressedSize: 10 });
+		const largePayload = { data: 'too large for the size limit' };
+		const compressed = await codec.compress(largePayload as never);
+
+		const result = await codec.tryDecompress(compressed, { fallback: true });
+		expect(result).toEqual({ fallback: true });
+	});
+});
+
+describe('engine stats', () => {
+	it('returns detailed stats from the engine stats method', async () => {
+		const engine = createClient.createWebShareEngine();
+		const sample = { test: 'data', count: 42 };
+		const stats = await engine.stats(sample);
+
+		expect(stats.codec).toBeTruthy();
+		expect(stats.token).toBeTruthy();
+		expect(stats.raw).toBeGreaterThan(0);
+		expect(stats.rawencoded).toBeGreaterThan(0);
+		expect(stats.compressedencoded).toBeGreaterThan(0);
+		expect(stats.compression).toBeGreaterThan(0);
+		expect(Array.isArray(stats.candidates)).toBe(true);
+		expect(stats.candidates.length).toBeGreaterThan(0);
+	});
+});
+
+describe('single-codec engine without prefix', () => {
+	it('omits prefix for single-codec engines when alwaysPrefix is false', async () => {
+		const engine = createClient.createEngine({
+			codecs: ['raw'],
+			alwaysPrefix: false
+		});
+		const sample = { single: true };
+		const compressed = await engine.compress(sample);
+
+		expect(compressed.startsWith('1.')).toBe(false);
+		const decompressed = await engine.decompress(compressed);
+		expect(decompressed).toEqual(sample);
+	});
+});
+
+describe('custom codec in engine', () => {
+	it('works with a custom codec that uses JSON + base64', async () => {
+		const engine = createClient.createEngine({
+			codecs: [
+				{
+					id: 'custom',
+					async compress(value: unknown) {
+						return Buffer.from(JSON.stringify(value)).toString('base64');
+					},
+					async decompress(token: string) {
+						return JSON.parse(Buffer.from(token, 'base64').toString('utf8'));
+					}
+				}
+			]
+		});
+
+		const sample = { custom: true, data: [1, 2, 3] };
+		const compressed = await engine.compress(sample);
+		const decompressed = await engine.decompress(compressed);
+
 		expect(decompressed).toEqual(sample);
 	});
 });

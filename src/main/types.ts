@@ -60,12 +60,14 @@ export interface ShareCodecDefinition {
 
 export interface CreateNamedCodecOptions {
 	transforms?: ShareTransform[];
+	maxDecompressedSize?: number;
 }
 
 export interface CreateEngineOptions extends CreateNamedCodecOptions {
 	codecs?: Array<string | ShareCodecDefinition>;
 	version?: string | number;
 	maxLength?: number;
+	maxDecompressedSize?: number;
 	alwaysPrefix?: boolean;
 	skipUnsupportedCodecs?: boolean;
 	defaultCodec?: string;

@@ -29,12 +29,17 @@ function decodePath(path: string): string[] {
 	return path.split('/').map((segment) => segment.replaceAll('~1', '/').replaceAll('~0', '~'));
 }
 
-function comparePathDepthDescending(left: string, right: string): number {
-	return decodePath(right).length - decodePath(left).length;
+function pathDepth(path: string): number {
+	if (!path) return 0;
+	return path.split('/').length;
 }
 
-function comparePathDepthAscending(left: string, right: string): number {
-	return decodePath(left).length - decodePath(right).length;
+function sortByPathDepthDescending(paths: string[]): string[] {
+	return [...paths].sort((a, b) => pathDepth(b) - pathDepth(a));
+}
+
+function sortByPathDepthAscending(paths: string[]): string[] {
+	return [...paths].sort((a, b) => pathDepth(a) - pathDepth(b));
 }
 
 function isHomogeneousObjectArray(value: unknown): value is Array<Record<string, unknown>> {
@@ -211,7 +216,7 @@ function applyPathVisitor(
 }
 
 function unpackWithSchema(value: unknown, schema: string[]): unknown {
-	const orderedSchema = [...schema].sort(comparePathDepthAscending);
+	const orderedSchema = sortByPathDepthAscending(schema);
 	let unpacked = value;
 	for (const path of orderedSchema) {
 		const segments = decodePath(path);
@@ -229,7 +234,7 @@ function encodePackedPayload(value: unknown): string {
 	}
 
 	return `${PACKED_PREFIX}${JSON.stringify({
-		schema: schema.sort(comparePathDepthDescending),
+		schema: sortByPathDepthDescending(schema),
 		data: prepared.data
 	} satisfies PackedEnvelope)}`;
 }

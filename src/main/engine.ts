@@ -43,7 +43,7 @@ const DEFAULT_WEB_SHARE_CODECS = Object.freeze(['raw', 'gz', 'df', 'zl', 'br', '
 const DEFAULT_WEB_SHARE_VERSION = '1';
 const DEFAULT_WEB_SHARE_MAX_LENGTH = 12000;
 
-function twoDigitPercentage(value: number): number {
+function truncateTo4Decimals(value: number): number {
 	return Math.floor(value * 10000) / 10000;
 }
 
@@ -206,6 +206,27 @@ function normalizeMaxLength(maxLength?: number | null): number {
 	return Math.floor(maxLength);
 }
 
+function normalizeMaxDecompressedSize(maxDecompressedSize?: number): number {
+	if (typeof maxDecompressedSize === 'undefined') {
+		return Number.POSITIVE_INFINITY;
+	}
+
+	if (typeof maxDecompressedSize !== 'number' || !Number.isFinite(maxDecompressedSize) || maxDecompressedSize <= 0) {
+		throw new Error('Expected maxDecompressedSize to be a positive finite number');
+	}
+
+	return Math.floor(maxDecompressedSize);
+}
+
+function enforceDecompressedSizeLimit(value: JsonUrlValue, limit: number): void {
+	if (limit === Number.POSITIVE_INFINITY) return;
+
+	const size = JSON.stringify(value).length;
+	if (size > limit) {
+		throw new Error(`Decompressed payload exceeds maxDecompressedSize (${size} > ${limit})`);
+	}
+}
+
 function createStatsBase({
 	rawText,
 	transformedText,
@@ -230,7 +251,7 @@ function createStatsBase({
 		transformed: transformedText.length,
 		transformedencoded,
 		compressedencoded: tokenLength,
-		compression: twoDigitPercentage(rawencoded / tokenLength)
+		compression: truncateTo4Decimals(rawencoded / tokenLength)
 	};
 }
 
@@ -265,6 +286,7 @@ export function createNamedCodec<TValue = JsonUrlValue>(
 ): NamedCodecClient<TValue> {
 	const transforms = normalizeTransforms(options.transforms);
 	const transformIds = transforms.map((transform) => transform.id);
+	const maxDecompressedSize = normalizeMaxDecompressedSize(options.maxDecompressedSize);
 	const { id, loadConfig } = getAlgorithmConfigLoader(algorithm);
 	let configPromise: Promise<CodecAlgorithmConfig> | null = null;
 
@@ -295,6 +317,7 @@ export function createNamedCodec<TValue = JsonUrlValue>(
 		const decoded = await decodeCompressedValue(normalized, config);
 		const decompressed = await config.decompress(decoded);
 		const unpacked = await deserializeValue(decompressed, config);
+		enforceDecompressedSizeLimit(unpacked, maxDecompressedSize);
 		return (await applyTransforms(unpacked, transforms, 'decode')) as TValue;
 	}
 
@@ -349,6 +372,7 @@ export function createEngine<TValue = JsonUrlValue>(
 	const codecEntries = codecSpecs.map((codec, index) => normalizeCodecSpec(codec, index));
 	const codecMap = new Map<string, CodecEntry>();
 	const maxLength = normalizeMaxLength(options.maxLength);
+	const maxDecompressedSize = normalizeMaxDecompressedSize(options.maxDecompressedSize);
 	const version =
 		typeof options.version === 'undefined'
 			? '1'
@@ -394,13 +418,20 @@ export function createEngine<TValue = JsonUrlValue>(
 		const candidates: CodecCandidateStats[] = [];
 		const skipped: SkippedCodecStat[] = [];
 
-		for (const entry of codecEntries) {
-			try {
+		const results = await Promise.allSettled(
+			codecEntries.map(async (entry) => {
 				const payload = await entry.client.compress(transformed);
 				if (typeof payload !== 'string') {
 					throw new Error(`Codec "${entry.id}" returned a non-string token`);
 				}
+				return { entry, payload };
+			})
+		);
 
+		for (let i = 0; i < results.length; i++) {
+			const result = results[i];
+			if (result.status === 'fulfilled') {
+				const { entry, payload } = result.value;
 				const token = alwaysPrefix ? buildToken(version, entry.id, payload) : payload;
 				candidates.push({
 					codec: entry.id,
@@ -411,15 +442,16 @@ export function createEngine<TValue = JsonUrlValue>(
 					rawencoded,
 					transformed: transformedText.length,
 					transformedencoded,
-					compression: twoDigitPercentage(rawencoded / token.length)
+					compression: truncateTo4Decimals(rawencoded / token.length)
 				});
-			} catch (error) {
+			} else {
+				const error = result.reason;
 				if (!skipUnsupportedCodecs || !isUnsupportedCodecError(error)) {
 					throw error;
 				}
 
 				skipped.push({
-					codec: entry.id,
+					codec: codecEntries[i].id,
 					reason: (error as Error).message
 				});
 			}
@@ -465,8 +497,7 @@ export function createEngine<TValue = JsonUrlValue>(
 
 	async function compressConditional(json: TValue): Promise<string | null> {
 		if (plainTextThreshold > 0) {
-			const rawText = JSON.stringify(json);
-			const rawencoded = encodeURIComponent(rawText).length;
+			const rawencoded = encodeURIComponent(JSON.stringify(json)).length;
 			if (rawencoded <= plainTextThreshold) {
 				return null;
 			}
@@ -480,6 +511,7 @@ export function createEngine<TValue = JsonUrlValue>(
 
 		if (parsed && parsed.version === version && codecMap.has(parsed.codecId)) {
 			const decoded = await codecMap.get(parsed.codecId)!.client.decompress(parsed.payload);
+			enforceDecompressedSizeLimit(decoded, maxDecompressedSize);
 			return (await applyTransforms(decoded, transforms, 'decode')) as TValue;
 		}
 
@@ -495,6 +527,7 @@ export function createEngine<TValue = JsonUrlValue>(
 		}
 
 		const decoded = await codecMap.get(defaultCodec)!.client.decompress(normalized);
+		enforceDecompressedSizeLimit(decoded, maxDecompressedSize);
 		return (await applyTransforms(decoded, transforms, 'decode')) as TValue;
 	}
 
