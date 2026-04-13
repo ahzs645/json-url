@@ -1,3 +1,5 @@
+import { resolveDefaultExport } from './resolve-default-export.js';
+
 interface LzStringApi {
 	compressToEncodedURIComponent(input: string): string;
 	decompressFromEncodedURIComponent(input: string): string | null;
@@ -5,11 +7,11 @@ interface LzStringApi {
 	decompressFromUint8Array(input: Uint8Array): string;
 }
 
-function resolveDefaultExport<T>(module: T | { default: T }): T {
-	return (module as { default?: T }).default || (module as T);
-}
+let cached: Promise<LzStringApi> | null = null;
 
-export async function loadLzString(): Promise<LzStringApi> {
-	const module = await import('lz-string');
-	return resolveDefaultExport<LzStringApi>(module);
+export function loadLzString(): Promise<LzStringApi> {
+	cached ??= import('lz-string').then((module) =>
+		resolveDefaultExport<LzStringApi>(module)
+	);
+	return cached;
 }

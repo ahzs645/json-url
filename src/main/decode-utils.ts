@@ -1,19 +1,15 @@
 import type { DecodeOptions } from './types.js';
 
 export function cleanEncodedInput(str: string): string {
+	const decoded = str.indexOf('%') >= 0 ? decodeURIComponent(str) : str;
+
 	let out = '';
 	let i = 0;
 	let j = 0;
-	let codePoint: number;
 
-	while (i < str.length) {
-		codePoint = str.charCodeAt(i);
-		if (codePoint === 37) {
-			if (i > j) out += str.slice(j, i);
-			str = decodeURIComponent(str.slice(i));
-			i = 0;
-			j = 0;
-		} else if (
+	while (i < decoded.length) {
+		const codePoint = decoded.charCodeAt(i);
+		if (
 			codePoint === 32 ||
 			codePoint === 10 ||
 			codePoint === 13 ||
@@ -21,7 +17,7 @@ export function cleanEncodedInput(str: string): string {
 			codePoint === 8232 ||
 			codePoint === 8233
 		) {
-			if (i > j) out += str.slice(j, i);
+			if (i > j) out += decoded.slice(j, i);
 			i += 1;
 			j = i;
 		} else {
@@ -29,7 +25,7 @@ export function cleanEncodedInput(str: string): string {
 		}
 	}
 
-	if (i > j) out += str.slice(j, i);
+	if (i > j) out += decoded.slice(j, i);
 	return out;
 }
 

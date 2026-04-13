@@ -1,15 +1,17 @@
 import type { LzmaApi } from 'lzma';
 
-function resolveDefaultExport<T>(module: T | { default: T }): T {
-	return (module as { default?: T }).default || (module as T);
-}
+import { resolveDefaultExport } from './resolve-default-export.js';
 
 interface LzmaExport extends LzmaApi {
 	LZMA?: LzmaApi;
 }
 
-export async function loadLzma(): Promise<LzmaApi> {
-	const module = await import('lzma');
-	const resolved = resolveDefaultExport<LzmaExport>(module);
-	return typeof resolved.compress === 'function' ? resolved : resolved.LZMA!;
+let cached: Promise<LzmaApi> | null = null;
+
+export function loadLzma(): Promise<LzmaApi> {
+	cached ??= import('lzma').then((module) => {
+		const resolved = resolveDefaultExport<LzmaExport>(module);
+		return typeof resolved.compress === 'function' ? resolved : resolved.LZMA!;
+	});
+	return cached;
 }
