@@ -200,6 +200,52 @@ describe('json-url engine', () => {
 		expect(stats.transforms).toEqual(['wrap']);
 	});
 
+	it('can encode known payloads as compact reference transforms', async () => {
+		const preset = {
+			builderName: 'MoCA Blind',
+			builderFields: [
+				{ id: 'section', type: 'section', label: 'MoCA Blind' },
+				{ id: 'score', type: 'number', label: 'Score' }
+			],
+			layoutDrafts: []
+		};
+		const editedPreset = {
+			...preset,
+			builderName: 'MoCA Blind Edited'
+		};
+		const engine = createClient.createWebShareEngine<typeof preset>({
+			codecs: ['raw'],
+			transforms: [
+				createClient.createReferenceTransform({
+					id: 'fixture-ref',
+					refKey: 'fixture',
+					entries: [{ key: 'moca-blind', value: preset }]
+				})
+			]
+		});
+
+		const referenced = await engine.compressDetailed(preset);
+		const edited = await engine.compressDetailed(editedPreset);
+		const decoded = await engine.decompress(referenced.token);
+
+		expect(referenced.transformed).toBe(JSON.stringify({ fixture: 'moca-blind' }).length);
+		expect(referenced.compressedencoded).toBeLessThan(edited.compressedencoded);
+		expect(decoded).toEqual(preset);
+	});
+
+	it('throws when a reference transform cannot resolve a key', async () => {
+		const codec = createClient('raw', {
+			transforms: [
+				createClient.createReferenceTransform({
+					entries: [{ key: 'known', value: { ok: true } }]
+				})
+			]
+		});
+		const token = await createClient('raw').compress({ $ref: 'missing' });
+
+		await expect(codec.decompress(token)).rejects.toThrow(/Unknown reference transform key/);
+	});
+
 	it('provides tryDecompress fallbacks for codec clients', async () => {
 		const codec = createClient<{ fallback: boolean }>('raw');
 		const decoded = await codec.tryDecompress('%7Bbad', { fallback: true }, { deURI: true });

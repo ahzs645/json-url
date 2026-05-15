@@ -1,4 +1,5 @@
 import { cleanEncodedInput } from './decode-utils.js';
+import { createReferenceTransform } from './reference-transform.js';
 import {
 	AVAILABLE_CODECS,
 	DEFAULT_WEB_SHARE_CODECS,
@@ -21,6 +22,7 @@ const createClient = Object.assign(
 		defaultWebShareCodecs: DEFAULT_WEB_SHARE_CODECS,
 		defaultWebShareMaxLength: DEFAULT_WEB_SHARE_MAX_LENGTH,
 		defaultWebShareVersion: DEFAULT_WEB_SHARE_VERSION,
+		createReferenceTransform,
 		createEngine,
 		createNamedCodec,
 		createWebShareEngine
@@ -39,6 +41,8 @@ export type {
 	JsonUrlValue,
 	NamedCodecClient,
 	NamedCodecStats,
+	ReferenceTransformEntry,
+	ReferenceTransformOptions,
 	ShareCodecDefinition,
 	ShareTransform
 } from './types.js';

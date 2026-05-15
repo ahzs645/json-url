@@ -71,6 +71,38 @@ You can now pass reversible object-level transforms before compression and after
 	});
 ```
 
+When a payload exactly matches a known preset, use `createReferenceTransform()` to encode the whole value as a stable reference and resolve it back on decode. This keeps preset share URLs short while preserving full payload links for edited/custom values.
+
+```
+	const JsonUrl = require('json-url');
+
+	const presets = [
+		{
+			key: 'moca-blind',
+			value: {
+				builderName: 'MoCA Blind',
+				builderFields: [/* full preset payload */]
+			}
+		}
+	];
+
+	const engine = JsonUrl.createWebShareEngine({
+		transforms: [
+			JsonUrl.createReferenceTransform({
+				id: 'fixture-ref',
+				refKey: 'fixture',
+				entries: presets.map((preset) => ({
+					key: preset.key,
+					value: preset.value
+				}))
+			})
+		]
+	});
+
+	const token = await engine.compress(presets[0].value);
+	const decoded = await engine.decompress(token);
+```
+
 ### Multi-codec Engine
 
 When you want to test multiple codecs and keep the shortest token, use `createEngine`. Tokens are prefixed as `version.codec.payload`, so the engine can auto-detect the codec when decoding.

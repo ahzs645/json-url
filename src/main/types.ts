@@ -14,6 +14,22 @@ export interface ShareTransform {
 	decode?: TransformHandler;
 }
 
+export type ReferenceTransformKey = string | number;
+
+export interface ReferenceTransformEntry<TValue = JsonUrlValue> {
+	key: ReferenceTransformKey;
+	value: TValue;
+}
+
+export interface ReferenceTransformOptions<TValue = JsonUrlValue> {
+	id?: string;
+	entries: Array<ReferenceTransformEntry<TValue>>;
+	refKey?: string;
+	valueKey?: string;
+	signature?: (value: TValue) => string;
+	clone?: (value: TValue) => TValue;
+}
+
 export interface CodecCandidateStats {
 	codec: string;
 	token: string;
@@ -106,6 +122,7 @@ export interface JsonUrlFactory {
 	defaultWebShareCodecs: readonly string[];
 	defaultWebShareMaxLength: number;
 	defaultWebShareVersion: string;
+	createReferenceTransform<TValue = JsonUrlValue>(options: ReferenceTransformOptions<TValue>): ShareTransform;
 	createEngine<TValue = JsonUrlValue>(options?: CreateEngineOptions): EngineClient<TValue>;
 	createNamedCodec<TValue = JsonUrlValue>(algorithm: string, options?: CreateNamedCodecOptions): NamedCodecClient<TValue>;
 	createWebShareEngine<TValue = JsonUrlValue>(options?: CreateEngineOptions): EngineClient<TValue>;
