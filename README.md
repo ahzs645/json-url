@@ -2,7 +2,7 @@
 
 [![npm downloads][downloads-image]][downloads-url] [![CI][ci-image]][ci-url]
 
-Generate URL-safe representations of some arbtirary JSON data in as small a space as possible that can be shared in a bookmark / link.
+Generate URL-safe representations of arbitrary JSON data in as small a space as possible that can be shared in a bookmark / link.
 
 Although designed to work in Node, a standalone client-side library is provided that can be used directly on the browser.
 
@@ -11,7 +11,7 @@ Although designed to work in Node, a standalone client-side library is provided 
 ### Compress
 
 ```
-	var codec = require('json-url')('lzw');
+	var codec = require('@firstform/json-url')('lzw');
 	var obj = { one: 1, two: 2, three: [1,2,3], four: 'red pineapples' };
 	codec.compress(obj).then(result => console.log(result));
 	/* Result: woTCo29uZQHCo3R3bwLCpXRocmVlwpMBAgPCpGZvdXLCrsSOZCBwacSDYXBwbGVz */
@@ -20,7 +20,7 @@ Although designed to work in Node, a standalone client-side library is provided 
 ### Decompress
 
 ```
-	var codec = require('json-url')('lzma');
+	var codec = require('@firstform/json-url')('lzma');
 	codec.decompress(someCompressedString).then(json => { /* operate on json */ })
 ```
 
@@ -29,7 +29,7 @@ Although designed to work in Node, a standalone client-side library is provided 
 If you want a fallback instead of an exception, use `tryDecompress`.
 
 ```
-	var codec = require('json-url')('raw');
+	var codec = require('@firstform/json-url')('raw');
 	codec.tryDecompress('%7Bbad', { ok: false }, { deURI: true }).then(result => {
 		console.log(result); // { ok: false }
 	});
@@ -38,7 +38,7 @@ If you want a fallback instead of an exception, use `tryDecompress`.
 ### Stats
 
 ```
-	var codec = require('json-url')('lzstring');
+	var codec = require('@firstform/json-url')('lzstring');
 	codec.stats(obj).then(
 		({ rawencoded, compressedencoded, compression }) => {
 			console.log(`Raw URI-encoded JSON string length: ${rawencoded}`);
@@ -53,7 +53,7 @@ If you want a fallback instead of an exception, use `tryDecompress`.
 You can now pass reversible object-level transforms before compression and after decompression. This is useful when you want to compact project-specific structures into portable primitive references before the codec runs.
 
 ```
-	const JsonUrl = require('json-url');
+	const JsonUrl = require('@firstform/json-url');
 	const codec = JsonUrl('lzstring', {
 		transforms: [
 			{
@@ -74,7 +74,7 @@ You can now pass reversible object-level transforms before compression and after
 When a payload exactly matches a known preset, use `createReferenceTransform()` to encode the whole value as a stable reference and resolve it back on decode. This keeps preset share URLs short while preserving full payload links for edited/custom values.
 
 ```
-	const JsonUrl = require('json-url');
+	const JsonUrl = require('@firstform/json-url');
 
 	const presets = [
 		{
@@ -108,7 +108,7 @@ When a payload exactly matches a known preset, use `createReferenceTransform()` 
 When you want to test multiple codecs and keep the shortest token, use `createEngine`. Tokens are prefixed as `version.codec.payload`, so the engine can auto-detect the codec when decoding.
 
 ```
-	const JsonUrl = require('json-url');
+	const JsonUrl = require('@firstform/json-url');
 
 	const engine = JsonUrl.createEngine({
 		codecs: ['hbr', 'br', 'hgz', 'gz', 'lzstring'],
@@ -159,13 +159,13 @@ When you want to test multiple codecs and keep the shortest token, use `createEn
 `createWebShareEngine()` enables the Webforms-style transport defaults:
 
 * token format `1.codec.payload`
-* codecs `raw`, `gz`, `df`, `br`, `lz`
+* codecs `raw`, `gz`, `df`, `zl`, `br`, `lz`
 * `alwaysPrefix: true`
 * `maxLength: 12000`
 * `skipUnsupportedCodecs: true`
 
 ```
-	const JsonUrl = require('json-url');
+	const JsonUrl = require('@firstform/json-url');
 	const engine = JsonUrl.createWebShareEngine({
 		transforms: [
 			{
@@ -216,20 +216,22 @@ To see it in action, download the source code and run `npm run example`, or simp
 	* gz - gzip via `CompressionStream` with environment fallback
 	* hgz - gzip with safe homogeneous-array prepacking for repeated object rows
 	* df - deflate-raw via `CompressionStream` with environment fallback
+	* zl - zlib/deflate via `CompressionStream` with environment fallback
 	* br - brotli via `CompressionStream` with environment fallback
 	* hbr - brotli with safe homogeneous-array prepacking for repeated object rows
 	* lz - `compressToEncodedURIComponent` / `decompressFromEncodedURIComponent`
 * `JsonUrl.createEngine()` can test multiple codecs, apply reversible transforms, and emit self-describing `version.codec.payload` tokens.
-* `JsonUrl.createWebShareEngine()` is a preset for `raw/gz/df/br/lz` with `version: "1"` and `maxLength: 12000`.
+* `JsonUrl.createWebShareEngine()` is a preset for `raw/gz/df/zl/br/lz` with `version: "1"` and `maxLength: 12000`.
 * `JsonUrl.cleanEncodedInput()` removes percent-encoding and ignorable whitespace before decode.
 
 ## Package Layout
 
 The package now exposes:
 
-* CommonJS via `require('json-url')`
-* ESM via `import JsonUrl from 'json-url'`
-* Browser UMD bundle via `json-url/browser`
+* CommonJS via `require('@firstform/json-url')`
+* ESM via `import JsonUrl from '@firstform/json-url'`
+* Browser module via `@firstform/json-url/browser`
+* Browser UMD bundle via `dist/browser/json-url-single.js`
 * Type declarations via `dist/index.d.ts`
 
 ## Motivation
@@ -243,7 +245,7 @@ However, if you want to:
 
 you would encode the data structure (typically JSON) in your URL, but this often results in very large URLs.
 
-This approach differs by removing that third-party dependency and encodes it using common compression algorithms such as LZW or LZMA.
+This approach differs by removing that third-party dependency and encodes it using common compression algorithms such as Brotli, gzip/deflate, LZ-string, LZW, and LZMA.
 
 Note: It is arguable that a custom dictionary / domain specific encoding would ultimately provide better compression, but here we want to
 * avoid maintaining such a dictionary and/or
@@ -251,11 +253,11 @@ Note: It is arguable that a custom dictionary / domain specific encoding would u
 
 ## Approach
 
-I explored several options, the most popular one being [MessagePack][1]. However, I noticed that it did not give the best possible compression as compared to [LZMA][2] and [LZW][3].
+I explored several options, the most popular one being [MessagePack][1]. MessagePack is still useful for some binary codecs, but the current engine can also choose from Brotli, gzip/deflate, LZ-string, raw Base64URL JSON, and homogeneous-array prepacking codecs.
 
 At first I tried to apply the binary compression directly on a stringified JSON, then I realised that packing it first resulted in better compression.
 
-For small JS objects, LZW largely outperformed LZMA, but for the most part you'd probably be looking to compress large JSON data rather than small amounts (otherwise a simple stringify + base64 is sufficient). You can choose to use whatever codec suits you best.
+Codec performance depends heavily on payload shape and runtime. For web share URLs, `createWebShareEngine()` tries several broadly available codecs and keeps the shortest result within the configured limit. You can still choose a specific codec when size, speed, or compatibility requirements are known.
 
 In addition, there is now support for [LZSTRING][5], although the URI encoding still uses urlsafe-base64 because LZSTRING still uses unsafe characters via their `compressToURIEncodedString` method - notably the [`+` character][6]
 

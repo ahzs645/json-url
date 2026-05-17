@@ -1,7 +1,28 @@
 import type { DecodeOptions } from './types.js';
 
-export function cleanEncodedInput(str: string): string {
-	const decoded = str.indexOf('%') >= 0 ? decodeURIComponent(str) : str;
+interface CleanEncodedInputOptions {
+	decode?: boolean;
+	space?: 'strip' | 'preserve' | 'plus';
+}
+
+function isIgnorableCodePoint(codePoint: number): boolean {
+	return (
+		codePoint === 9 ||
+		codePoint === 10 ||
+		codePoint === 11 ||
+		codePoint === 12 ||
+		codePoint === 13 ||
+		codePoint === 0 ||
+		codePoint === 160 ||
+		codePoint === 8232 ||
+		codePoint === 8233
+	);
+}
+
+export function cleanEncodedInput(str: string, options: CleanEncodedInputOptions = {}): string {
+	const shouldDecode = options.decode !== false;
+	const decoded = shouldDecode && str.indexOf('%') >= 0 ? decodeURIComponent(str) : str;
+	const spaceMode = options.space ?? 'strip';
 
 	let out = '';
 	let i = 0;
@@ -9,15 +30,14 @@ export function cleanEncodedInput(str: string): string {
 
 	while (i < decoded.length) {
 		const codePoint = decoded.charCodeAt(i);
-		if (
-			codePoint === 32 ||
-			codePoint === 10 ||
-			codePoint === 13 ||
-			codePoint === 0 ||
-			codePoint === 8232 ||
-			codePoint === 8233
-		) {
+		if (codePoint === 32 && spaceMode === 'preserve') {
+			i += 1;
+			continue;
+		}
+
+		if (codePoint === 32 || isIgnorableCodePoint(codePoint)) {
 			if (i > j) out += decoded.slice(j, i);
+			if (codePoint === 32 && spaceMode === 'plus') out += '+';
 			i += 1;
 			j = i;
 		} else {
@@ -39,11 +59,15 @@ export function normalizeDecodeOptions(options: DecodeOptions = {}): Required<De
 	};
 }
 
-export function prepareEncodedInput(input: string, options: DecodeOptions = {}): string {
+export function prepareEncodedInput(
+	input: string,
+	options: DecodeOptions = {},
+	cleanOptions?: CleanEncodedInputOptions
+): string {
 	if (typeof input !== 'string') {
 		throw new Error('Expected encoded input to be a string');
 	}
 
 	const { deURI } = normalizeDecodeOptions(options);
-	return deURI ? cleanEncodedInput(input) : input;
+	return deURI ? cleanEncodedInput(input, cleanOptions) : input;
 }

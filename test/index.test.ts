@@ -153,7 +153,7 @@ describe('json-url engine', () => {
 			layoutDrafts: []
 		};
 
-		for (const algorithm of ['raw', 'gz', 'df', 'br', 'lz']) {
+		for (const algorithm of ['raw', 'gz', 'df', 'zl', 'br', 'lz']) {
 			const codec = createClient(algorithm);
 			const token = await codec.compress(sample);
 			const decompressed = await codec.decompress(token);
@@ -176,6 +176,34 @@ describe('json-url engine', () => {
 
 		const decoded = await engine.decompress(dirtyToken, { deURI: true });
 		expect(decoded).toEqual(sample);
+	});
+
+	it('keeps lz plus characters intact after URLSearchParams parsing with deURI', async () => {
+		const engine = createClient.createWebShareEngine({
+			codecs: ['lz']
+		});
+		const sample = { s: 'x\u{1F600}1', arr: [1, 1, 'abc'] };
+		const token = await engine.compress(sample);
+		const queryValue = new URLSearchParams(`value=${token}`).get('value');
+
+		expect(queryValue).not.toBeNull();
+		expect(queryValue).not.toBe(token);
+		await expect(engine.decompress(queryValue as string, { deURI: true })).resolves.toEqual(
+			sample
+		);
+	});
+
+	it('keeps single-codec lz plus characters intact after URLSearchParams parsing with deURI', async () => {
+		const codec = createClient('lz');
+		const sample = { s: 'x\u{1F600}1', arr: [1, 1, 'abc'] };
+		const token = await codec.compress(sample);
+		const queryValue = new URLSearchParams(`value=${token}`).get('value');
+
+		expect(queryValue).not.toBeNull();
+		expect(queryValue).not.toBe(token);
+		await expect(codec.decompress(queryValue as string, { deURI: true })).resolves.toEqual(
+			sample
+		);
 	});
 
 	it('applies transforms for the single-codec client API', async () => {
@@ -251,6 +279,20 @@ describe('json-url engine', () => {
 		const decoded = await codec.tryDecompress('%7Bbad', { fallback: true }, { deURI: true });
 
 		expect(decoded).toEqual({ fallback: true });
+	});
+
+	it('rejects malformed base64url payloads before permissive decoding', async () => {
+		const codec = createClient('raw');
+		const token = await codec.compress({ ok: true });
+
+		await expect(codec.decompress(`!${token}`)).rejects.toThrow(/valid base64url/);
+		await expect(codec.decompress(`${token}....`)).rejects.toThrow(/valid base64url/);
+	});
+
+	it('rejects lzstring payloads that decompress to null', async () => {
+		const codec = createClient('lzstring');
+
+		await expect(codec.decompress('__8')).rejects.toThrow(/Unable to decode lzstring/);
 	});
 
 	it('selects the shortest codec candidate and decodes prefixed tokens', async () => {
@@ -366,6 +408,15 @@ describe('json-url engine', () => {
 
 		expect(decoded).toEqual({ fallback: true });
 	});
+
+	it('rejects malformed base64url payloads in prefixed engine tokens', async () => {
+		const engine = createClient.createWebShareEngine({
+			codecs: ['raw']
+		});
+		const token = await engine.compress({ ok: true });
+
+		await expect(engine.decompress(`${token}....`)).rejects.toThrow(/valid base64url/);
+	});
 });
 
 describe('homogeneous codecs', () => {
@@ -455,12 +506,14 @@ describe('homogeneous codecs', () => {
 describe('cleanEncodedInput', () => {
 	it('strips whitespace characters', () => {
 		expect(cleanEncodedInput(' hello ')).toBe('hello');
+		expect(cleanEncodedInput('\thello\t')).toBe('hello');
 		expect(cleanEncodedInput('\nhello\r')).toBe('hello');
 		expect(cleanEncodedInput('\0hello\0')).toBe('hello');
 	});
 
 	it('strips unicode line/paragraph separators', () => {
 		expect(cleanEncodedInput('\u2028hello\u2029')).toBe('hello');
+		expect(cleanEncodedInput('\u00a0hello\u00a0')).toBe('hello');
 	});
 
 	it('decodes percent-encoded segments and strips resulting whitespace', () => {
@@ -620,6 +673,42 @@ describe('maxDecompressedSize guard', () => {
 
 		const result = await codec.tryDecompress(compressed, { fallback: true });
 		expect(result).toEqual({ fallback: true });
+	});
+
+	it('rejects named codec payloads that exceed the limit after decode transforms', async () => {
+		const codec = createClient('raw', {
+			maxDecompressedSize: 20,
+			transforms: [
+				{
+					id: 'expand',
+					decode: (value) =>
+						value === 'small' ? { data: 'x'.repeat(1000) } : value
+				}
+			]
+		});
+		const compressed = await createClient('raw').compress('small');
+
+		await expect(codec.decompress(compressed)).rejects.toThrow(/exceeds maxDecompressedSize/);
+	});
+
+	it('rejects engine payloads that exceed the limit after decode transforms', async () => {
+		const engine = createClient.createEngine({
+			codecs: ['raw'],
+			alwaysPrefix: true,
+			maxDecompressedSize: 20,
+			transforms: [
+				{
+					id: 'expand',
+					decode: (value) =>
+						value === 'small' ? { data: 'x'.repeat(1000) } : value
+				}
+			]
+		});
+		const compressed = await createClient
+			.createEngine({ codecs: ['raw'], alwaysPrefix: true })
+			.compress('small');
+
+		await expect(engine.decompress(compressed)).rejects.toThrow(/exceeds maxDecompressedSize/);
 	});
 });
 

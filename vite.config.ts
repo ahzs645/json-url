@@ -15,7 +15,8 @@ export default defineConfig({
 		lib: {
 			entry: {
 				index: resolve(__dirname, 'src/main/index.ts'),
-				'web-share': resolve(__dirname, 'src/main/web-share.ts')
+				'web-share': resolve(__dirname, 'src/main/web-share.ts'),
+				browser: resolve(__dirname, 'src/main/browser.ts')
 			},
 			name: 'JsonUrl',
 			formats: ['es', 'cjs'],

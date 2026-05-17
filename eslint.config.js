@@ -9,7 +9,7 @@ export default tseslint.config(
 	js.configs.recommended,
 	...tseslint.configs.recommended,
 	{
-		files: ['**/*.{ts,mts,cts}'],
+		files: ['**/*.{js,mjs,cjs,ts,mts,cts}'],
 		languageOptions: {
 			ecmaVersion: 'latest',
 			sourceType: 'module',

@@ -12,8 +12,8 @@ async function main(): Promise<void> {
 		for (const datum of samples) {
 			const { raw, rawencoded, compressedencoded, compression } = await lib.stats(datum);
 			results[counter] = results[counter] || {};
-			results[counter].raw = raw;
-			results[counter].rawencoded = rawencoded;
+			results[counter].json = raw;
+			results[counter].jsonencoded = rawencoded;
 			results[counter][algorithm] = {
 				ratio: compression,
 				compressed: compressedencoded

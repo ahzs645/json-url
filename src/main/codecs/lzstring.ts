@@ -10,9 +10,13 @@ const lzstring: CodecAlgorithmConfig = {
 		return Buffer.from((await loadLzString()).compressToUint8Array(String(value)));
 	},
 	async decompress(buffer) {
-		return (await loadLzString()).decompressFromUint8Array(
+		const result = (await loadLzString()).decompressFromUint8Array(
 			typeof buffer === 'string' ? new TextEncoder().encode(buffer) : Buffer.from(buffer)
 		);
+		if (result === null) {
+			throw new Error('Unable to decode lzstring codec payload');
+		}
+		return result;
 	}
 };
 

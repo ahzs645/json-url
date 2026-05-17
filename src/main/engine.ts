@@ -153,6 +153,9 @@ async function decodeCompressedValue(
 	}
 
 	const safe64 = await CORE_LOADERS.safe64();
+	if (!safe64.validate(value)) {
+		throw new Error('Encoded payload is not valid base64url');
+	}
 	return safe64.decode(value);
 }
 
@@ -312,13 +315,19 @@ export function createNamedCodec<TValue = JsonUrlValue>(
 	}
 
 	async function decompress(string: string, options = {}): Promise<TValue> {
-		const normalized = prepareEncodedInput(string, options);
 		const config = await getConfig();
+		const normalized = prepareEncodedInput(
+			string,
+			options,
+			id === 'lz' ? { space: 'plus' } : undefined
+		);
 		const decoded = await decodeCompressedValue(normalized, config);
 		const decompressed = await config.decompress(decoded);
 		const unpacked = await deserializeValue(decompressed, config);
 		enforceDecompressedSizeLimit(unpacked, maxDecompressedSize);
-		return (await applyTransforms(unpacked, transforms, 'decode')) as TValue;
+		const transformed = await applyTransforms(unpacked, transforms, 'decode');
+		enforceDecompressedSizeLimit(transformed, maxDecompressedSize);
+		return transformed as TValue;
 	}
 
 	async function tryDecompress(
@@ -506,13 +515,20 @@ export function createEngine<TValue = JsonUrlValue>(
 	}
 
 	async function decompress(token: string, options = {}): Promise<TValue> {
-		const normalized = prepareEncodedInput(token, options);
+		const normalized = prepareEncodedInput(token, options, { space: 'preserve' });
 		const parsed = parseToken(normalized);
 
 		if (parsed && parsed.version === version && codecMap.has(parsed.codecId)) {
-			const decoded = await codecMap.get(parsed.codecId)!.client.decompress(parsed.payload);
+			const payload = prepareEncodedInput(
+				parsed.payload,
+				options,
+				parsed.codecId === 'lz' ? { decode: false, space: 'plus' } : { decode: false }
+			);
+			const decoded = await codecMap.get(parsed.codecId)!.client.decompress(payload);
 			enforceDecompressedSizeLimit(decoded, maxDecompressedSize);
-			return (await applyTransforms(decoded, transforms, 'decode')) as TValue;
+			const transformed = await applyTransforms(decoded, transforms, 'decode');
+			enforceDecompressedSizeLimit(transformed, maxDecompressedSize);
+			return transformed as TValue;
 		}
 
 		if (parsed && (alwaysPrefix || codecEntries.length > 1)) {
@@ -526,9 +542,16 @@ export function createEngine<TValue = JsonUrlValue>(
 			throw new Error('Encoded token is missing a version/codec prefix');
 		}
 
-		const decoded = await codecMap.get(defaultCodec)!.client.decompress(normalized);
+		const payload = prepareEncodedInput(
+			normalized,
+			options,
+			defaultCodec === 'lz' ? { decode: false, space: 'plus' } : { decode: false }
+		);
+		const decoded = await codecMap.get(defaultCodec)!.client.decompress(payload);
 		enforceDecompressedSizeLimit(decoded, maxDecompressedSize);
-		return (await applyTransforms(decoded, transforms, 'decode')) as TValue;
+		const transformed = await applyTransforms(decoded, transforms, 'decode');
+		enforceDecompressedSizeLimit(transformed, maxDecompressedSize);
+		return transformed as TValue;
 	}
 
 	async function tryDecompress(

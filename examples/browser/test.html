@@ -96,15 +96,6 @@
 			<div>
 				<label for="algorithm">Algorithm</label>
 				<select id="algorithm" name="algorithm">
-					<option value="raw">raw</option>
-					<option value="gz">gz</option>
-					<option value="df">df</option>
-					<option value="br">br</option>
-					<option value="lz">lz</option>
-					<option value="lzw">lzw</option>
-					<option value="lzma">lzma</option>
-					<option value="lzstring">lzstring</option>
-					<option value="pack">pack</option>
 				</select>
 			</div>
 			<div>
@@ -133,28 +124,37 @@
 			violets: 'blue',
 			fruits: [ 'apple', 2 ]
 		}, null, 2);
-			algorithm.addEventListener('change', () => {
-				result.value = '';
-				decompressed.value = '';
-				generate.click();
-			});
-			generate.addEventListener('click', () => {
-				try {
-					const parsed = JSON.parse(json.value);
-					const lib = JsonUrl(algorithm.value);
-					lib.compress(parsed).then(output => { result.value = output; });
-				} catch (err) {
-					result.value = `Unable to compress. Reason: ${err}`;
-				}
-			});
-			decompress.addEventListener('click', () => {
-				try {
-					const compressed = result.value.trim();
-					const lib = JsonUrl(algorithm.value);
-					lib.decompress(compressed).then(output => { decompressed.value = JSON.stringify(output, null, 2); })
-				} catch (err) {
-					decompressed.value = `Unable to decompress. Reason: ${err}`;
-				}
-			});
+		for (const codec of JsonUrl.availableCodecs) {
+			const option = document.createElement('option');
+			option.value = codec;
+			option.textContent = codec;
+			option.selected = codec === 'raw';
+			algorithm.append(option);
+		}
+
+		algorithm.addEventListener('change', () => {
+			result.value = '';
+			decompressed.value = '';
+			generate.click();
+		});
+		generate.addEventListener('click', async () => {
+			try {
+				const parsed = JSON.parse(json.value);
+				const lib = JsonUrl(algorithm.value);
+				result.value = await lib.compress(parsed);
+			} catch (err) {
+				result.value = `Unable to compress. Reason: ${err}`;
+			}
+		});
+		decompress.addEventListener('click', async () => {
+			try {
+				const compressed = result.value.trim();
+				const lib = JsonUrl(algorithm.value);
+				const output = await lib.decompress(compressed);
+				decompressed.value = JSON.stringify(output, null, 2);
+			} catch (err) {
+				decompressed.value = `Unable to decompress. Reason: ${err}`;
+			}
+		});
 	</script>
 </html>

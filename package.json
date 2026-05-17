@@ -28,7 +28,12 @@
 			"require": "./dist/web-share.cjs",
 			"default": "./dist/web-share.js"
 		},
-		"./browser": "./dist/browser/json-url-single.js",
+		"./browser": {
+			"types": "./dist/browser.d.ts",
+			"import": "./dist/browser.js",
+			"require": "./dist/browser.cjs",
+			"default": "./dist/browser.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"files": [
@@ -45,9 +50,10 @@
 		"build:browser": "vite build --config vite.browser.config.ts",
 		"build:types": "tsc -p tsconfig.build.json",
 		"compile": "npm run build",
-		"prepublishOnly": "npm test && npm run build",
+		"prepublishOnly": "npm test && npm run build && npm run test:package",
 		"test": "npm run lint && npm run typecheck && vitest run",
 		"test:node": "vitest run",
+		"test:package": "node scripts/smoke-package.mjs",
 		"coverage": "vitest run --coverage",
 		"perf": "tsx test/perf.ts",
 		"example": "npm run build:browser && open http://localhost:8000/examples/browser/test.html & static-server --port 8000",
