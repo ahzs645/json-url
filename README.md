@@ -198,10 +198,21 @@ When you want to test multiple codecs and keep the shortest token, use `createEn
 </script>
 ```
 
+For web-share style use cases that do not need the legacy MessagePack/LZMA/LZW codecs, use the lite bundle:
+
+```
+<script type="text/javascript" src="/dist/browser/json-url-lite.js"></script>
+<script>
+	const engine = JsonUrl.createWebShareEngine(); // raw/gz/df/zl/br/lz by default
+	engine.compress(parsed).then(output => { result.value = output; });
+</script>
+```
+
 To see it in action, download the source code and run `npm run example`, or simply visit [this link](http://jsbin.com/cayuhox).
 
 * The browser bundle is now generated with Vite/Rollup as a single UMD file at `dist/browser/json-url-single.js`.
-* The bundle is still relatively large because it includes runtime polyfills and codec dependencies needed for standalone browser use.
+* The lite browser bundle is generated at `dist/browser/json-url-lite.js`.
+* The full bundle is still relatively large because it includes runtime polyfills and legacy codec dependencies needed for standalone browser compatibility.
 
 ## Usage Notes
 
@@ -231,7 +242,9 @@ The package now exposes:
 * CommonJS via `require('@firstform/json-url')`
 * ESM via `import JsonUrl from '@firstform/json-url'`
 * Browser module via `@firstform/json-url/browser`
+* Lite browser module via `@firstform/json-url/browser-lite`
 * Browser UMD bundle via `dist/browser/json-url-single.js`
+* Lite browser UMD bundle via `dist/browser/json-url-lite.js`
 * Type declarations via `dist/index.d.ts`
 
 ## Motivation

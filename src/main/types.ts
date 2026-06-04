@@ -134,3 +134,7 @@ export interface CodecAlgorithmConfig {
 	compress(input: string | Uint8Array): Promise<string | Uint8Array>;
 	decompress(input: string | Uint8Array): Promise<string | Uint8Array>;
 }
+
+export type CodecAlgorithmLoader = () => Promise<CodecAlgorithmConfig>;
+
+export type CodecAlgorithmRegistry = Record<string, CodecAlgorithmLoader>;

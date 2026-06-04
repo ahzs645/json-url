@@ -7,7 +7,7 @@ import {
 	createEngine,
 	createNamedCodec,
 	createWebShareEngine
-} from './full-runtime.js';
+} from './lite-runtime.js';
 
 const createClient = createJsonUrlFactory({
 	AVAILABLE_CODECS,
@@ -18,25 +18,5 @@ const createClient = createJsonUrlFactory({
 	createNamedCodec,
 	createWebShareEngine
 });
-
-export type {
-	CodecAlgorithmConfig,
-	CodecAlgorithmLoader,
-	CodecAlgorithmRegistry,
-	CodecCandidateStats,
-	CreateEngineOptions,
-	CreateNamedCodecOptions,
-	DecodeOptions,
-	EngineClient,
-	EngineCompressResult,
-	JsonUrlFactory,
-	JsonUrlValue,
-	NamedCodecClient,
-	NamedCodecStats,
-	ReferenceTransformEntry,
-	ReferenceTransformOptions,
-	ShareCodecDefinition,
-	ShareTransform
-} from './types.js';
 
 export default createClient;

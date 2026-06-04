@@ -1,4 +1,4 @@
-import { createWebShareEngine } from './engine.js';
+import { createWebShareEngine } from './full-runtime.js';
 
 import type { CreateEngineOptions, EngineClient, JsonUrlValue } from './types.js';
 

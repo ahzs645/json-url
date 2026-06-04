@@ -1,20 +1,13 @@
-import { Buffer } from 'buffer';
-
 import type { CodecAlgorithmConfig } from '../types.js';
 
 const raw: CodecAlgorithmConfig = {
 	pack: false,
 	encode: true,
 	async compress(value) {
-		return Buffer.from(
-			typeof value === 'string' ? value : Buffer.from(value).toString('utf8'),
-			'utf8'
-		);
+		return typeof value === 'string' ? new TextEncoder().encode(value) : value;
 	},
 	async decompress(buffer) {
-		return Buffer.from(
-			typeof buffer === 'string' ? Buffer.from(buffer, 'utf8') : buffer
-		).toString('utf8');
+		return typeof buffer === 'string' ? buffer : new TextDecoder().decode(buffer);
 	}
 };
 

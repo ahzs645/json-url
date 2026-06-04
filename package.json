@@ -34,6 +34,12 @@
 			"require": "./dist/browser.cjs",
 			"default": "./dist/browser.js"
 		},
+		"./browser-lite": {
+			"types": "./dist/browser-lite.d.ts",
+			"import": "./dist/browser-lite.js",
+			"require": "./dist/browser-lite.cjs",
+			"default": "./dist/browser-lite.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"files": [
@@ -47,7 +53,7 @@
 		"typecheck": "tsc --noEmit",
 		"build": "npm run clean && npm run build:lib && npm run build:browser && npm run build:types",
 		"build:lib": "vite build",
-		"build:browser": "vite build --config vite.browser.config.ts",
+		"build:browser": "vite build --config vite.browser.config.ts && vite build --config vite.browser-lite.config.ts",
 		"build:types": "tsc -p tsconfig.build.json",
 		"compile": "npm run build",
 		"prepublishOnly": "npm test && npm run build && npm run test:package",

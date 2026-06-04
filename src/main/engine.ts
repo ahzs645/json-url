@@ -1,12 +1,10 @@
-import { Buffer } from 'buffer';
-
-import ALGORITHMS from './codecs/index.js';
 import { createUnsupportedCodecError } from './codecs/stream-codec.js';
-import CORE_LOADERS from './core-loaders.js';
 import { prepareEncodedInput } from './decode-utils.js';
 
 import type {
 	CodecAlgorithmConfig,
+	CodecAlgorithmLoader,
+	CodecAlgorithmRegistry,
 	CodecCandidateStats,
 	CreateEngineOptions,
 	CreateNamedCodecOptions,
@@ -19,7 +17,6 @@ import type {
 	ShareTransform,
 	SkippedCodecStat
 } from './types.js';
-import type { CodecAlgorithmLoader } from './codecs/index.js';
 
 interface NormalizedTransform {
 	id: string;
@@ -38,10 +35,27 @@ interface CodecEntry {
 	client: ShareCodecDefinition;
 }
 
-const AVAILABLE_CODECS = Object.freeze(Object.keys(ALGORITHMS));
+interface MsgPackCodec {
+	encode(value: unknown): Uint8Array;
+	decode(value: Uint8Array): unknown;
+}
+
 const DEFAULT_WEB_SHARE_CODECS = Object.freeze(['raw', 'gz', 'df', 'zl', 'br', 'lz']);
 const DEFAULT_WEB_SHARE_VERSION = '1';
 const DEFAULT_WEB_SHARE_MAX_LENGTH = 12000;
+
+interface JsonUrlRuntimeOptions {
+	algorithms: CodecAlgorithmRegistry;
+	defaultWebShareCodecs?: readonly string[];
+	defaultWebShareVersion?: string;
+	defaultWebShareMaxLength?: number;
+	loadMsgpack?: () => Promise<MsgPackCodec>;
+}
+
+interface BufferConstructorLike {
+	from(input: string, encoding: string): Uint8Array;
+	from(input: Uint8Array): { toString(encoding: string): string };
+}
 
 function truncateTo4Decimals(value: number): number {
 	return Math.floor(value * 10000) / 10000;
@@ -110,26 +124,82 @@ async function applyTransforms(
 
 async function serializeValue(
 	value: JsonUrlValue,
-	config: CodecAlgorithmConfig
+	config: CodecAlgorithmConfig,
+	loadMsgpack?: () => Promise<MsgPackCodec>
 ): Promise<string | Uint8Array> {
 	if (!config.pack) {
 		return JSON.stringify(value);
 	}
 
-	const msgpack = await CORE_LOADERS.msgpack();
+	if (!loadMsgpack) {
+		throw new Error('MessagePack is not available in this runtime');
+	}
+
+	const msgpack = await loadMsgpack();
 	return msgpack.encode(value);
 }
 
 async function deserializeValue(
 	value: string | Uint8Array,
-	config: CodecAlgorithmConfig
+	config: CodecAlgorithmConfig,
+	loadMsgpack?: () => Promise<MsgPackCodec>
 ): Promise<JsonUrlValue> {
 	if (!config.pack) {
 		return JSON.parse(String(value));
 	}
 
-	const msgpack = await CORE_LOADERS.msgpack();
-	return msgpack.decode(Buffer.from(value));
+	if (!loadMsgpack) {
+		throw new Error('MessagePack is not available in this runtime');
+	}
+
+	const msgpack = await loadMsgpack();
+	return msgpack.decode(typeof value === 'string' ? new TextEncoder().encode(value) : value);
+}
+
+function getGlobalBuffer(): BufferConstructorLike | null {
+	const candidate = (globalThis as { Buffer?: BufferConstructorLike }).Buffer;
+	return candidate && typeof candidate.from === 'function' ? candidate : null;
+}
+
+function bytesToBinary(bytes: Uint8Array): string {
+	let binary = '';
+	const chunkSize = 0x8000;
+	for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+		binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+	}
+	return binary;
+}
+
+function binaryToBytes(binary: string): Uint8Array {
+	const bytes = new Uint8Array(binary.length);
+	for (let index = 0; index < binary.length; index += 1) {
+		bytes[index] = binary.charCodeAt(index);
+	}
+	return bytes;
+}
+
+function toBase64Url(value: string | Uint8Array): string {
+	const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
+	const buffer = getGlobalBuffer();
+	const base64 = buffer ? buffer.from(bytes).toString('base64') : btoa(bytesToBinary(bytes));
+
+	return base64.replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+function fromBase64Url(value: string): Uint8Array {
+	if (!/^[A-Za-z0-9\-_]+$/.test(value)) {
+		throw new Error('Encoded payload is not valid base64url');
+	}
+
+	const base64 = `${value.replaceAll('-', '+').replaceAll('_', '/')}${'='.repeat(
+		(4 - (value.length % 4)) % 4
+	)}`;
+	const buffer = getGlobalBuffer();
+	if (buffer) {
+		return new Uint8Array(buffer.from(base64, 'base64'));
+	}
+
+	return binaryToBytes(atob(base64));
 }
 
 async function encodeCompressedValue(
@@ -137,11 +207,10 @@ async function encodeCompressedValue(
 	config: CodecAlgorithmConfig
 ): Promise<string> {
 	if (!config.encode) {
-		return typeof value === 'string' ? value : Buffer.from(value).toString('utf8');
+		return typeof value === 'string' ? value : new TextDecoder().decode(value);
 	}
 
-	const safe64 = await CORE_LOADERS.safe64();
-	return safe64.encode(typeof value === 'string' ? Buffer.from(value, 'utf8') : Buffer.from(value));
+	return toBase64Url(value);
 }
 
 async function decodeCompressedValue(
@@ -152,24 +221,21 @@ async function decodeCompressedValue(
 		return value;
 	}
 
-	const safe64 = await CORE_LOADERS.safe64();
-	if (!safe64.validate(value)) {
-		throw new Error('Encoded payload is not valid base64url');
-	}
-	return safe64.decode(value);
+	return fromBase64Url(value);
 }
 
 function getAlgorithmConfigLoader(
-	algorithm: string
+	algorithm: string,
+	algorithms: CodecAlgorithmRegistry
 ): { id: string; loadConfig: CodecAlgorithmLoader } {
 	const codecId = normalizeCodecId(algorithm, 'algorithm');
-	if (!Object.prototype.hasOwnProperty.call(ALGORITHMS, codecId)) {
+	if (!Object.prototype.hasOwnProperty.call(algorithms, codecId)) {
 		throw new Error(`No such algorithm ${codecId}`);
 	}
 
 	return {
 		id: codecId,
-		loadConfig: ALGORITHMS[codecId]
+		loadConfig: algorithms[codecId]
 	};
 }
 
@@ -258,9 +324,13 @@ function createStatsBase({
 	};
 }
 
-function normalizeCodecSpec(codec: string | ShareCodecDefinition, index: number): CodecEntry {
+function normalizeCodecSpec(
+	codec: string | ShareCodecDefinition,
+	index: number,
+	createCodec: (algorithm: string) => ShareCodecDefinition
+): CodecEntry {
 	if (typeof codec === 'string') {
-		const client = createNamedCodec(codec);
+		const client = createCodec(codec);
 		return { id: client.id, client };
 	}
 
@@ -283,14 +353,26 @@ function isUnsupportedCodecError(error: unknown): error is Error & { code: strin
 	return Boolean(error) && typeof error === 'object' && (error as { code?: string }).code === 'ERR_UNSUPPORTED_CODEC';
 }
 
-export function createNamedCodec<TValue = JsonUrlValue>(
+export function createJsonUrlRuntime({
+	algorithms,
+	defaultWebShareCodecs = DEFAULT_WEB_SHARE_CODECS,
+	defaultWebShareVersion = DEFAULT_WEB_SHARE_VERSION,
+	defaultWebShareMaxLength = DEFAULT_WEB_SHARE_MAX_LENGTH,
+	loadMsgpack
+}: JsonUrlRuntimeOptions) {
+	const AVAILABLE_CODECS = Object.freeze(Object.keys(algorithms));
+	const RUNTIME_WEB_SHARE_CODECS = Object.freeze(Array.from(defaultWebShareCodecs));
+	const RUNTIME_WEB_SHARE_VERSION = defaultWebShareVersion;
+	const RUNTIME_WEB_SHARE_MAX_LENGTH = defaultWebShareMaxLength;
+
+	function createNamedCodec<TValue = JsonUrlValue>(
 	algorithm: string,
 	options: CreateNamedCodecOptions = {}
 ): NamedCodecClient<TValue> {
 	const transforms = normalizeTransforms(options.transforms);
 	const transformIds = transforms.map((transform) => transform.id);
 	const maxDecompressedSize = normalizeMaxDecompressedSize(options.maxDecompressedSize);
-	const { id, loadConfig } = getAlgorithmConfigLoader(algorithm);
+	const { id, loadConfig } = getAlgorithmConfigLoader(algorithm, algorithms);
 	let configPromise: Promise<CodecAlgorithmConfig> | null = null;
 
 	function getConfig(): Promise<CodecAlgorithmConfig> {
@@ -309,7 +391,7 @@ export function createNamedCodec<TValue = JsonUrlValue>(
 	async function compress(json: TValue): Promise<string> {
 		const { transformed } = await prepareInput(json);
 		const config = await getConfig();
-		const packed = await serializeValue(transformed, config);
+		const packed = await serializeValue(transformed, config, loadMsgpack);
 		const compressed = await config.compress(packed);
 		return encodeCompressedValue(compressed, config);
 	}
@@ -323,7 +405,7 @@ export function createNamedCodec<TValue = JsonUrlValue>(
 		);
 		const decoded = await decodeCompressedValue(normalized, config);
 		const decompressed = await config.decompress(decoded);
-		const unpacked = await deserializeValue(decompressed, config);
+		const unpacked = await deserializeValue(decompressed, config, loadMsgpack);
 		enforceDecompressedSizeLimit(unpacked, maxDecompressedSize);
 		const transformed = await applyTransforms(unpacked, transforms, 'decode');
 		enforceDecompressedSizeLimit(transformed, maxDecompressedSize);
@@ -369,7 +451,7 @@ export function createNamedCodec<TValue = JsonUrlValue>(
 	};
 }
 
-export function createEngine<TValue = JsonUrlValue>(
+	function createEngine<TValue = JsonUrlValue>(
 	options: CreateEngineOptions = {}
 ): EngineClient<TValue> {
 	const transforms = normalizeTransforms(options.transforms);
@@ -378,7 +460,9 @@ export function createEngine<TValue = JsonUrlValue>(
 		Array.isArray(options.codecs) && options.codecs.length > 0
 			? options.codecs
 			: AVAILABLE_CODECS;
-	const codecEntries = codecSpecs.map((codec, index) => normalizeCodecSpec(codec, index));
+	const codecEntries = codecSpecs.map((codec, index) =>
+		normalizeCodecSpec(codec, index, createNamedCodec)
+	);
 	const codecMap = new Map<string, CodecEntry>();
 	const maxLength = normalizeMaxLength(options.maxLength);
 	const maxDecompressedSize = normalizeMaxDecompressedSize(options.maxDecompressedSize);
@@ -587,16 +671,16 @@ export function createEngine<TValue = JsonUrlValue>(
 	};
 }
 
-export function createWebShareEngine<TValue = JsonUrlValue>(
+	function createWebShareEngine<TValue = JsonUrlValue>(
 	options: CreateEngineOptions = {}
 ): EngineClient<TValue> {
 	const nextOptions = {
 		...options,
-		version: typeof options.version === 'undefined' ? DEFAULT_WEB_SHARE_VERSION : options.version,
+		version: typeof options.version === 'undefined' ? RUNTIME_WEB_SHARE_VERSION : options.version,
 		alwaysPrefix: typeof options.alwaysPrefix === 'undefined' ? true : options.alwaysPrefix,
 		maxLength:
 			typeof options.maxLength === 'undefined'
-				? DEFAULT_WEB_SHARE_MAX_LENGTH
+				? RUNTIME_WEB_SHARE_MAX_LENGTH
 				: options.maxLength,
 		skipUnsupportedCodecs:
 			typeof options.skipUnsupportedCodecs === 'undefined'
@@ -605,15 +689,19 @@ export function createWebShareEngine<TValue = JsonUrlValue>(
 		codecs:
 			Array.isArray(options.codecs) && options.codecs.length > 0
 				? options.codecs
-				: Array.from(DEFAULT_WEB_SHARE_CODECS)
+				: Array.from(RUNTIME_WEB_SHARE_CODECS)
 	};
 
 	return createEngine<TValue>(nextOptions);
 }
 
-export {
-	AVAILABLE_CODECS,
-	DEFAULT_WEB_SHARE_CODECS,
-	DEFAULT_WEB_SHARE_MAX_LENGTH,
-	DEFAULT_WEB_SHARE_VERSION
-};
+	return {
+		AVAILABLE_CODECS,
+		DEFAULT_WEB_SHARE_CODECS: RUNTIME_WEB_SHARE_CODECS,
+		DEFAULT_WEB_SHARE_MAX_LENGTH: RUNTIME_WEB_SHARE_MAX_LENGTH,
+		DEFAULT_WEB_SHARE_VERSION: RUNTIME_WEB_SHARE_VERSION,
+		createEngine,
+		createNamedCodec,
+		createWebShareEngine
+	};
+}

@@ -16,7 +16,8 @@ export default defineConfig({
 			entry: {
 				index: resolve(__dirname, 'src/main/index.ts'),
 				'web-share': resolve(__dirname, 'src/main/web-share.ts'),
-				browser: resolve(__dirname, 'src/main/browser.ts')
+				browser: resolve(__dirname, 'src/main/browser.ts'),
+				'browser-lite': resolve(__dirname, 'src/main/browser-lite.ts')
 			},
 			name: 'JsonUrl',
 			formats: ['es', 'cjs'],
@@ -39,7 +40,7 @@ export default defineConfig({
 			provider: 'v8',
 			reporter: ['text', 'lcov', 'json-summary'],
 			include: ['src/main/**/*.ts'],
-			exclude: ['src/main/external-modules.d.ts', 'src/main/browser.ts']
+			exclude: ['src/main/external-modules.d.ts', 'src/main/browser.ts', 'src/main/browser-lite.ts']
 		}
 	}
 });
