@@ -120,12 +120,11 @@ function decompressWithNodeZlib(
 	}
 }
 
-export async function compressTextWithStreamCodec(
-	value: string,
+export async function compressBytesWithStreamCodec(
+	input: Uint8Array,
 	format: StreamCodecFormat,
 	codecId: string
 ): Promise<Uint8Array> {
-	const input = new TextEncoder().encode(value);
 	const zlib = await CORE_LOADERS.zlib();
 	if (zlib) {
 		const fallbackResult = compressWithNodeZlib(input, format, zlib);
@@ -141,25 +140,40 @@ export async function compressTextWithStreamCodec(
 	);
 }
 
-export async function decompressTextWithStreamCodec(
-	buffer: Uint8Array,
+export async function decompressBytesWithStreamCodec(
+	input: Uint8Array,
 	format: StreamCodecFormat,
 	codecId: string
-): Promise<string> {
-	const input = buffer;
+): Promise<Uint8Array> {
 	const zlib = await CORE_LOADERS.zlib();
 	if (zlib) {
 		const fallbackResult = decompressWithNodeZlib(input, format, zlib);
-		if (fallbackResult) return new TextDecoder().decode(fallbackResult);
+		if (fallbackResult) return fallbackResult;
 	}
 
 	const streamResult = await decompressWithStreams(input, format);
-	if (streamResult) return new TextDecoder().decode(streamResult);
+	if (streamResult) return streamResult;
 
 	throw createUnsupportedCodecError(
 		codecId,
 		`Codec "${codecId}" cannot be decoded in this environment.`
 	);
+}
+
+export async function compressTextWithStreamCodec(
+	value: string,
+	format: StreamCodecFormat,
+	codecId: string
+): Promise<Uint8Array> {
+	return compressBytesWithStreamCodec(new TextEncoder().encode(value), format, codecId);
+}
+
+export async function decompressTextWithStreamCodec(
+	buffer: Uint8Array,
+	format: StreamCodecFormat,
+	codecId: string
+): Promise<string> {
+	return new TextDecoder().decode(await decompressBytesWithStreamCodec(buffer, format, codecId));
 }
 
 export { createUnsupportedCodecError };

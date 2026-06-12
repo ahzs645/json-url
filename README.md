@@ -103,6 +103,55 @@ When a payload exactly matches a known preset, use `createReferenceTransform()` 
 	const decoded = await engine.decompress(token);
 ```
 
+### Key Map Transform
+
+When your payloads use long, well-known property names, `createKeyMapTransform()` reversibly shortens them before compression and restores them after decompression. Keys are renamed recursively through nested objects and arrays; unknown keys are left untouched.
+
+```
+	const JsonUrl = require('@firstform/json-url');
+
+	const engine = JsonUrl.createWebShareEngine({
+		transforms: [
+			JsonUrl.createKeyMapTransform({
+				keys: {
+					builderName: 'bn',
+					builderFields: 'bf',
+					fieldLabel: 'fl'
+				}
+			})
+		]
+	});
+```
+
+Mappings are validated up front: short keys must be unique, must not equal their long key, and must not chain (a short key cannot also appear as a long key). If renaming would collide with a key already present on an object, the transform throws instead of silently corrupting data.
+
+### URL Helpers
+
+Every codec and engine can read and write tokens directly on a URL, so you don't have to wire up `URLSearchParams` yourself. Tokens go into a query parameter (default name `data`) or into the hash fragment.
+
+```
+	const engine = JsonUrl.createWebShareEngine();
+
+	const url = await engine.compressToUrl(state, 'https://app.example.com/share');
+	// https://app.example.com/share?data=1.br....
+
+	const hashUrl = await engine.compressToUrl(state, 'https://app.example.com/share', {
+		param: 's',
+		location: 'hash'
+	});
+	// https://app.example.com/share#s=1.br....
+
+	const restored = await engine.decompressFromUrl(url);
+	const safe = await engine.tryDecompressFromUrl(window.location.href, defaultState);
+
+	// Throw instead of producing a URL that browsers or chat apps may truncate
+	const bounded = await engine.compressToUrl(state, 'https://app.example.com/share', {
+		maxUrlLength: 2000
+	});
+```
+
+`decompressFromUrl()` checks the query string first and falls back to the hash fragment unless you pass an explicit `location`. Existing query parameters and hash params on the URL are preserved. The standalone helpers `JsonUrl.buildShareUrl(baseUrl, token, options)` and `JsonUrl.extractTokenFromUrl(url, options)` are also exported if you only need the URL plumbing.
+
 ### Multi-codec Engine
 
 When you want to test multiple codecs and keep the shortest token, use `createEngine`. Tokens are prefixed as `version.codec.payload`, so the engine can auto-detect the codec when decoding.
@@ -152,6 +201,32 @@ When you want to test multiple codecs and keep the shortest token, use `createEn
 ```
 	const decoded = await engine.decompress('%201.raw.eyJvayI6dHJ1ZX0%20', { deURI: true });
 	const fallback = await engine.tryDecodeToken('%7Bbad', { ok: false }, { deURI: true });
+```
+
+### Token Checksums
+
+URLs copied through chat apps and email clients sometimes get truncated, which produces tokens that either fail to decode or (worse) decode to mangled data. Pass `checksum: true` to an engine to append a CRC32 segment to every token (`version.codec.payload.checksum`). On decode the checksum is verified before anything else, so truncation and tampering are reported with a clear error instead of a confusing codec failure.
+
+```
+	const engine = JsonUrl.createWebShareEngine({ checksum: true });
+	const token = await engine.compress(state); // 1.br.<payload>.k3f9a01
+
+	await engine.decompress(token);             // ok
+	await engine.decompress(token.slice(0, -10));
+	// Error: Token checksum mismatch — the token may have been truncated or corrupted
+```
+
+The checksum adds 8 characters to the token. Engines with `checksum: true` require it on decode, so enable it only when both ends are upgraded.
+
+### Number Precision Transform
+
+Floating point state (map coordinates, slider positions, chart zoom) often carries far more precision than a share URL needs. `createNumberPrecisionTransform()` rounds every non-integer number to a fixed number of decimals before compression. It is intentionally lossy and one-way: nothing is restored on decode.
+
+```
+	const engine = JsonUrl.createWebShareEngine({
+		transforms: [JsonUrl.createNumberPrecisionTransform({ decimals: 3 })]
+	});
+	// { x: 12.000001876, y: -45.67890123 } is encoded as { x: 12, y: -45.679 }
 ```
 
 ### Web Share Engine
@@ -219,10 +294,14 @@ To see it in action, download the source code and run `npm run example`, or simp
 	* zl - zlib/deflate via `CompressionStream` with environment fallback
 	* br - brotli via `CompressionStream` with environment fallback
 	* hbr - brotli with safe homogeneous-array prepacking for repeated object rows
+	* pbr - MessagePack packing followed by brotli; usually the shortest tokens overall
+	* pdf - MessagePack packing followed by deflate-raw; strong on small payloads
 	* lz - `compressToEncodedURIComponent` / `decompressFromEncodedURIComponent`
 * `JsonUrl.createEngine()` can test multiple codecs, apply reversible transforms, and emit self-describing `version.codec.payload` tokens.
 * `JsonUrl.createWebShareEngine()` is a preset for `raw/gz/df/zl/br/lz` with `version: "1"` and `maxLength: 12000`.
 * `JsonUrl.cleanEncodedInput()` removes percent-encoding and ignorable whitespace before decode.
+* `JsonUrl.createKeyMapTransform()` reversibly shortens well-known object keys before compression.
+* Codecs and engines expose `compressToUrl()` / `decompressFromUrl()` / `tryDecompressFromUrl()` for reading and writing tokens directly on URLs.
 
 ## Package Layout
 

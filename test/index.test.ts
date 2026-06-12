@@ -767,3 +767,343 @@ describe('custom codec in engine', () => {
 		expect(decompressed).toEqual(sample);
 	});
 });
+
+describe('url helpers', () => {
+	const sample = { shared: true, items: [1, 2, 3], note: 'hello world' };
+
+	it('round-trips through a query parameter on an engine', async () => {
+		const engine = createClient.createWebShareEngine();
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/share');
+
+		const parsed = new URL(url);
+		expect(parsed.searchParams.get('data')).toBeTruthy();
+
+		const decoded = await engine.decompressFromUrl(url);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('round-trips through a hash fragment with a custom param', async () => {
+		const engine = createClient.createWebShareEngine();
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/share', {
+			param: 's',
+			location: 'hash'
+		});
+
+		expect(new URL(url).hash.startsWith('#s=')).toBe(true);
+
+		const decoded = await engine.decompressFromUrl(url, { param: 's' });
+		expect(decoded).toEqual(sample);
+	});
+
+	it('round-trips on a named codec client', async () => {
+		const codec = createClient('lzstring');
+		const url = await codec.compressToUrl(sample, 'https://app.example.com/');
+		const decoded = await codec.decompressFromUrl(url);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('round-trips the lz codec through URL serialization', async () => {
+		const engine = createClient.createEngine({ codecs: ['lz'] });
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/');
+		const decoded = await engine.decompressFromUrl(url);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('preserves existing query parameters and hash params', async () => {
+		const engine = createClient.createWebShareEngine();
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/?lang=en#tab=settings', {
+			location: 'hash'
+		});
+
+		const parsed = new URL(url);
+		expect(parsed.searchParams.get('lang')).toBe('en');
+		const hashParams = new URLSearchParams(parsed.hash.slice(1));
+		expect(hashParams.get('tab')).toBe('settings');
+		expect(hashParams.get('data')).toBeTruthy();
+
+		const decoded = await engine.decompressFromUrl(url);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('finds the token in the hash without a location hint', async () => {
+		const engine = createClient.createWebShareEngine();
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/', { location: 'hash' });
+		const decoded = await engine.decompressFromUrl(url);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('throws when the parameter is missing and supports try fallback', async () => {
+		const engine = createClient.createWebShareEngine();
+		await expect(engine.decompressFromUrl('https://app.example.com/')).rejects.toThrow(
+			/No token found/
+		);
+
+		const fallback = { ok: false };
+		expect(await engine.tryDecompressFromUrl('https://app.example.com/', fallback)).toEqual(fallback);
+		expect(await engine.tryDecompressFromUrl('not a url', fallback)).toEqual(fallback);
+		expect(
+			await engine.tryDecompressFromUrl('https://app.example.com/?data=%7Bbad', fallback)
+		).toEqual(fallback);
+	});
+
+	it('rejects invalid base URLs and option values', async () => {
+		const engine = createClient.createWebShareEngine();
+		await expect(engine.compressToUrl(sample, 'not a url')).rejects.toThrow(/absolute URL/);
+		await expect(
+			engine.compressToUrl(sample, 'https://app.example.com/', { param: '  ' })
+		).rejects.toThrow(/non-empty string/);
+		await expect(
+			engine.compressToUrl(sample, 'https://app.example.com/', {
+				location: 'path' as unknown as 'query'
+			})
+		).rejects.toThrow(/"query" or "hash"/);
+	});
+
+	it('exposes buildShareUrl and extractTokenFromUrl as standalone helpers', () => {
+		const url = createClient.buildShareUrl('https://app.example.com/', '1.raw.eyJvayI6dHJ1ZX0');
+		expect(createClient.extractTokenFromUrl(url)).toBe('1.raw.eyJvayI6dHJ1ZX0');
+		expect(createClient.extractTokenFromUrl('https://app.example.com/')).toBeNull();
+	});
+});
+
+describe('key map transform', () => {
+	const keys = {
+		builderName: 'bn',
+		builderFields: 'bf',
+		fieldLabel: 'fl'
+	};
+
+	it('shortens known keys recursively and restores them on decode', async () => {
+		const engine = createClient.createWebShareEngine({
+			transforms: [createClient.createKeyMapTransform({ keys })]
+		});
+
+		const sample = {
+			builderName: 'MoCA Blind',
+			builderFields: [
+				{ fieldLabel: 'Name', value: 'a' },
+				{ fieldLabel: 'Score', nested: { builderName: 'inner' } }
+			],
+			untouched: true
+		};
+
+		const token = await engine.compress(sample);
+		const decoded = await engine.decompress(token);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('produces shorter raw codec tokens than the untransformed payload', async () => {
+		const plain = createClient.createEngine({ codecs: ['raw'] });
+		const mapped = createClient.createEngine({
+			codecs: ['raw'],
+			transforms: [createClient.createKeyMapTransform({ keys })]
+		});
+
+		const sample = {
+			builderFields: Array.from({ length: 10 }, (_, i) => ({ fieldLabel: `Field ${i}` }))
+		};
+
+		const plainToken = await plain.compress(sample);
+		const mappedToken = await mapped.compress(sample);
+		expect(mappedToken.length).toBeLessThan(plainToken.length);
+	});
+
+	it('works standalone in both directions', async () => {
+		const transform = createClient.createKeyMapTransform({ keys });
+		const encoded = await transform.encode!({ builderName: 'x', list: [{ fieldLabel: 'y' }] });
+		expect(encoded).toEqual({ bn: 'x', list: [{ fl: 'y' }] });
+
+		const decoded = await transform.decode!(encoded);
+		expect(decoded).toEqual({ builderName: 'x', list: [{ fieldLabel: 'y' }] });
+	});
+
+	it('throws when renaming would collide with an existing key', async () => {
+		const transform = createClient.createKeyMapTransform({ keys });
+		await expect(async () =>
+			transform.encode!({ builderName: 'x', bn: 'y' })
+		).rejects.toThrow(/duplicate key "bn"/);
+	});
+
+	it('rejects invalid mappings', () => {
+		expect(() =>
+			createClient.createKeyMapTransform({ keys: { a: 'a' } })
+		).toThrow(/maps to itself/);
+		expect(() =>
+			createClient.createKeyMapTransform({ keys: { a: 'c', b: 'c' } })
+		).toThrow(/Duplicate key map transform short key/);
+		expect(() =>
+			createClient.createKeyMapTransform({ keys: { a: 'b', b: 'c' } })
+		).toThrow(/must not chain/);
+		expect(() =>
+			createClient.createKeyMapTransform({ keys: { a: '' } })
+		).toThrow(/non-empty string/);
+		expect(() =>
+			createClient.createKeyMapTransform({ keys: [] as unknown as Record<string, string> })
+		).toThrow(/must be an object/);
+	});
+});
+
+describe('packed binary codecs (pbr, pdf)', () => {
+	const sample = {
+		builderName: 'MoCA Blind',
+		rows: Array.from({ length: 8 }, (_, i) => ({ id: i, score: i * 1.5, label: `Row ${i}` }))
+	};
+
+	it('round-trips through the named codec clients', async () => {
+		for (const alg of ['pbr', 'pdf'] as const) {
+			const codec = createClient(alg);
+			const token = await codec.compress(sample);
+			expect(validate(token)).toBe(true);
+			expect(await codec.decompress(token)).toEqual(sample);
+		}
+	});
+
+	it('round-trips through an engine with codec auto-detection', async () => {
+		const engine = createClient.createEngine({ codecs: ['pbr', 'pdf', 'br'] });
+		const token = await engine.compress(sample);
+		expect(await engine.decompress(token)).toEqual(sample);
+	});
+
+	it('is competitive with the text-based brotli codec', async () => {
+		const br = createClient('br');
+		const pbr = createClient('pbr');
+		const brToken = await br.compress(sample);
+		const pbrToken = await pbr.compress(sample);
+		// Not asserting strict improvement (payload-dependent), but it should be close.
+		expect(pbrToken.length).toBeLessThanOrEqual(brToken.length * 1.1);
+	});
+});
+
+describe('token checksum', () => {
+	const sample = { ok: true, items: [1, 2, 3], note: 'checksummed' };
+
+	it('appends a verifiable checksum segment and round-trips', async () => {
+		const engine = createClient.createWebShareEngine({ checksum: true });
+		expect(engine.checksum).toBe(true);
+
+		const token = await engine.compress(sample);
+		expect(token.split('.').length).toBe(4);
+		expect(token).toMatch(/\.[0-9a-z]{7}$/);
+		expect(await engine.decompress(token)).toEqual(sample);
+	});
+
+	it('rejects truncated and tampered tokens', async () => {
+		const engine = createClient.createWebShareEngine({ checksum: true });
+		const token = await engine.compress(sample);
+
+		await expect(engine.decompress(token.slice(0, -10))).rejects.toThrow(/checksum/);
+
+		const tampered = `${token.slice(0, 8)}${token[8] === 'A' ? 'B' : 'A'}${token.slice(9)}`;
+		await expect(engine.decompress(tampered)).rejects.toThrow(/checksum mismatch/);
+
+		const noChecksum = token.slice(0, token.lastIndexOf('.'));
+		await expect(engine.decompress(noChecksum)).rejects.toThrow(/missing a checksum/);
+	});
+
+	it('survives URL round-trips and tryDecompress fallback', async () => {
+		const engine = createClient.createWebShareEngine({ checksum: true });
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/');
+		expect(await engine.decompressFromUrl(url)).toEqual(sample);
+
+		const fallback = { ok: false };
+		expect(await engine.tryDecompress('1.raw.bogus.zzzzzzz', fallback)).toEqual(fallback);
+	});
+
+	it('does not affect engines without the option and rejects bad config', async () => {
+		const engine = createClient.createWebShareEngine();
+		expect(engine.checksum).toBe(false);
+		const token = await engine.compress(sample);
+		expect(token.split('.').length).toBe(3);
+
+		expect(() =>
+			createClient.createEngine({ codecs: ['raw'], checksum: true, alwaysPrefix: false })
+		).toThrow(/checksum requires prefixed tokens/);
+	});
+
+	it('defaults a single-codec checksum engine to prefixed tokens', async () => {
+		const engine = createClient.createEngine({ codecs: ['raw'], checksum: true });
+		const token = await engine.compress(sample);
+		expect(token.startsWith('1.raw.')).toBe(true);
+		expect(await engine.decompress(token)).toEqual(sample);
+	});
+});
+
+describe('maxUrlLength guard', () => {
+	const sample = { data: 'x'.repeat(200) };
+
+	it('throws when the built URL exceeds maxUrlLength', async () => {
+		const engine = createClient.createWebShareEngine();
+		await expect(
+			engine.compressToUrl(sample, 'https://app.example.com/', { maxUrlLength: 50 })
+		).rejects.toThrow(/exceeds maxUrlLength/);
+	});
+
+	it('passes when the URL fits and rejects invalid limits', async () => {
+		const engine = createClient.createWebShareEngine();
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/', {
+			maxUrlLength: 10000
+		});
+		expect(url.length).toBeLessThanOrEqual(10000);
+
+		await expect(
+			engine.compressToUrl(sample, 'https://app.example.com/', { maxUrlLength: -1 })
+		).rejects.toThrow(/positive finite number/);
+	});
+});
+
+describe('number precision transform', () => {
+	it('rounds floats recursively while leaving other values alone', async () => {
+		const transform = createClient.createNumberPrecisionTransform({ decimals: 2 });
+		const encoded = await transform.encode!({
+			pi: 3.14159265,
+			coords: [12.000001, -45.6789],
+			count: 7,
+			label: 'x',
+			nested: { ratio: 0.333333 },
+			weird: [Infinity, NaN]
+		});
+
+		expect(encoded).toEqual({
+			pi: 3.14,
+			coords: [12, -45.68],
+			count: 7,
+			label: 'x',
+			nested: { ratio: 0.33 },
+			weird: [Infinity, NaN]
+		});
+	});
+
+	it('shrinks tokens through an engine', async () => {
+		const noisy = {
+			points: Array.from({ length: 20 }, (_, i) => ({
+				x: i + 0.123456789012345,
+				y: i * 1.987654321098765
+			}))
+		};
+
+		const plain = createClient.createEngine({ codecs: ['raw'] });
+		const trimmed = createClient.createEngine({
+			codecs: ['raw'],
+			transforms: [createClient.createNumberPrecisionTransform({ decimals: 3 })]
+		});
+
+		const plainToken = await plain.compress(noisy);
+		const trimmedToken = await trimmed.compress(noisy);
+		expect(trimmedToken.length).toBeLessThan(plainToken.length);
+
+		const decoded = await trimmed.decompress(trimmedToken) as typeof noisy;
+		expect(decoded.points[1].x).toBe(1.123);
+	});
+
+	it('rejects invalid decimals', () => {
+		expect(() => createClient.createNumberPrecisionTransform({ decimals: -1 })).toThrow(
+			/between 0 and 15/
+		);
+		expect(() => createClient.createNumberPrecisionTransform({ decimals: 1.5 })).toThrow(
+			/between 0 and 15/
+		);
+		expect(() =>
+			createClient.createNumberPrecisionTransform({ decimals: 16 })
+		).toThrow(/between 0 and 15/);
+	});
+});
