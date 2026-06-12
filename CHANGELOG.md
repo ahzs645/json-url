@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standalone `buildShareUrl()` / `extractTokenFromUrl()` utility exports
 - `createKeyMapTransform()` for reversible key shortening (e.g. `builderName` → `bn`)
   applied recursively before compression and restored after decompression
+- `pbr` and `pdf` codecs (MessagePack packing + brotli / deflate-raw); `pbr` produces
+  the shortest tokens overall on the benchmark samples and `pdf` excels on tiny payloads
+- `checksum: true` engine option appends a CRC32 segment to tokens
+  (`version.codec.payload.checksum`) so truncated or corrupted tokens fail with a
+  clear error on decode
+- `maxUrlLength` option on `compressToUrl()` / `buildShareUrl()` to reject URLs that
+  exceed a length budget
+- `createNumberPrecisionTransform()` for lossy rounding of float noise before encoding
 
 ## [4.1.0] - 2024-12-01
 

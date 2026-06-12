@@ -26,6 +26,18 @@ function normalizeLocation(location?: UrlShareLocation): UrlShareLocation | unde
 	return location;
 }
 
+function normalizeMaxUrlLength(maxUrlLength?: number): number {
+	if (typeof maxUrlLength === 'undefined') {
+		return Number.POSITIVE_INFINITY;
+	}
+
+	if (typeof maxUrlLength !== 'number' || !Number.isFinite(maxUrlLength) || maxUrlLength <= 0) {
+		throw new Error('Expected maxUrlLength to be a positive finite number');
+	}
+
+	return Math.floor(maxUrlLength);
+}
+
 function parseUrl(input: string, label: string): URL {
 	if (typeof input !== 'string' || !input.trim()) {
 		throw new Error(`Expected ${label} to be a non-empty string`);
@@ -54,6 +66,7 @@ export function buildShareUrl(
 
 	const param = normalizeParam(options.param);
 	const location = normalizeLocation(options.location) ?? 'query';
+	const maxUrlLength = normalizeMaxUrlLength(options.maxUrlLength);
 	const url = parseUrl(baseUrl, 'baseUrl');
 
 	if (location === 'query') {
@@ -64,7 +77,12 @@ export function buildShareUrl(
 		url.hash = hashParams.toString();
 	}
 
-	return url.toString();
+	const result = url.toString();
+	if (result.length > maxUrlLength) {
+		throw new Error(`Share URL exceeds maxUrlLength (${result.length} > ${maxUrlLength})`);
+	}
+
+	return result;
 }
 
 export function extractTokenFromUrl(

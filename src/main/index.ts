@@ -1,5 +1,6 @@
 import { cleanEncodedInput } from './decode-utils.js';
 import { createKeyMapTransform } from './key-map-transform.js';
+import { createNumberPrecisionTransform } from './number-precision-transform.js';
 import { createReferenceTransform } from './reference-transform.js';
 import { buildShareUrl, extractTokenFromUrl } from './url-utils.js';
 import {
@@ -26,6 +27,7 @@ const createClient = Object.assign(
 		defaultWebShareVersion: DEFAULT_WEB_SHARE_VERSION,
 		createReferenceTransform,
 		createKeyMapTransform,
+		createNumberPrecisionTransform,
 		buildShareUrl,
 		extractTokenFromUrl,
 		createEngine,
@@ -47,6 +49,7 @@ export type {
 	KeyMapTransformOptions,
 	NamedCodecClient,
 	NamedCodecStats,
+	NumberPrecisionTransformOptions,
 	ReferenceTransformEntry,
 	ReferenceTransformOptions,
 	ShareCodecDefinition,

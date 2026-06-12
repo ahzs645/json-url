@@ -1,5 +1,6 @@
 import { Buffer } from 'buffer';
 
+import { appendChecksum, stripChecksum } from './checksum.js';
 import ALGORITHMS from './codecs/index.js';
 import { createUnsupportedCodecError } from './codecs/stream-codec.js';
 import CORE_LOADERS from './core-loaders.js';
@@ -430,10 +431,15 @@ export function createEngine<TValue = JsonUrlValue>(
 		typeof options.plainTextThreshold === 'number' && Number.isFinite(options.plainTextThreshold) && options.plainTextThreshold > 0
 			? Math.floor(options.plainTextThreshold)
 			: 0;
+	const checksum = options.checksum === true;
 	const alwaysPrefix =
 		typeof options.alwaysPrefix === 'boolean'
 			? options.alwaysPrefix
-			: codecEntries.length !== 1;
+			: checksum || codecEntries.length !== 1;
+
+	if (checksum && !alwaysPrefix) {
+		throw new Error('checksum requires prefixed tokens; do not set alwaysPrefix to false');
+	}
 	const defaultCodec =
 		typeof options.defaultCodec === 'undefined'
 			? codecEntries[0]?.id
@@ -480,7 +486,8 @@ export function createEngine<TValue = JsonUrlValue>(
 			const result = results[i];
 			if (result.status === 'fulfilled') {
 				const { entry, payload } = result.value;
-				const token = alwaysPrefix ? buildToken(version, entry.id, payload) : payload;
+				const prefixed = alwaysPrefix ? buildToken(version, entry.id, payload) : payload;
+				const token = checksum ? appendChecksum(prefixed) : prefixed;
 				candidates.push({
 					codec: entry.id,
 					token,
@@ -554,7 +561,19 @@ export function createEngine<TValue = JsonUrlValue>(
 	}
 
 	async function decompress(token: string, options = {}): Promise<TValue> {
-		const normalized = prepareEncodedInput(token, options, { space: 'preserve' });
+		let normalized = prepareEncodedInput(token, options, { space: 'preserve' });
+
+		if (checksum) {
+			const stripped = stripChecksum(normalized);
+			if (!stripped) {
+				throw new Error('Encoded token is missing a checksum segment');
+			}
+			if (!stripped.valid) {
+				throw new Error('Token checksum mismatch — the token may have been truncated or corrupted');
+			}
+			normalized = stripped.token;
+		}
+
 		const parsed = parseToken(normalized);
 
 		if (parsed && parsed.version === version && codecMap.has(parsed.codecId)) {
@@ -615,6 +634,7 @@ export function createEngine<TValue = JsonUrlValue>(
 		transforms: transformIds,
 		skipUnsupportedCodecs,
 		plainTextThreshold,
+		checksum,
 		compress,
 		compressConditional,
 		compressBest: compressDetailed,

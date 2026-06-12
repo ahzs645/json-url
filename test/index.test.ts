@@ -942,3 +942,168 @@ describe('key map transform', () => {
 		).toThrow(/must be an object/);
 	});
 });
+
+describe('packed binary codecs (pbr, pdf)', () => {
+	const sample = {
+		builderName: 'MoCA Blind',
+		rows: Array.from({ length: 8 }, (_, i) => ({ id: i, score: i * 1.5, label: `Row ${i}` }))
+	};
+
+	it('round-trips through the named codec clients', async () => {
+		for (const alg of ['pbr', 'pdf'] as const) {
+			const codec = createClient(alg);
+			const token = await codec.compress(sample);
+			expect(validate(token)).toBe(true);
+			expect(await codec.decompress(token)).toEqual(sample);
+		}
+	});
+
+	it('round-trips through an engine with codec auto-detection', async () => {
+		const engine = createClient.createEngine({ codecs: ['pbr', 'pdf', 'br'] });
+		const token = await engine.compress(sample);
+		expect(await engine.decompress(token)).toEqual(sample);
+	});
+
+	it('is competitive with the text-based brotli codec', async () => {
+		const br = createClient('br');
+		const pbr = createClient('pbr');
+		const brToken = await br.compress(sample);
+		const pbrToken = await pbr.compress(sample);
+		// Not asserting strict improvement (payload-dependent), but it should be close.
+		expect(pbrToken.length).toBeLessThanOrEqual(brToken.length * 1.1);
+	});
+});
+
+describe('token checksum', () => {
+	const sample = { ok: true, items: [1, 2, 3], note: 'checksummed' };
+
+	it('appends a verifiable checksum segment and round-trips', async () => {
+		const engine = createClient.createWebShareEngine({ checksum: true });
+		expect(engine.checksum).toBe(true);
+
+		const token = await engine.compress(sample);
+		expect(token.split('.').length).toBe(4);
+		expect(token).toMatch(/\.[0-9a-z]{7}$/);
+		expect(await engine.decompress(token)).toEqual(sample);
+	});
+
+	it('rejects truncated and tampered tokens', async () => {
+		const engine = createClient.createWebShareEngine({ checksum: true });
+		const token = await engine.compress(sample);
+
+		await expect(engine.decompress(token.slice(0, -10))).rejects.toThrow(/checksum/);
+
+		const tampered = `${token.slice(0, 8)}${token[8] === 'A' ? 'B' : 'A'}${token.slice(9)}`;
+		await expect(engine.decompress(tampered)).rejects.toThrow(/checksum mismatch/);
+
+		const noChecksum = token.slice(0, token.lastIndexOf('.'));
+		await expect(engine.decompress(noChecksum)).rejects.toThrow(/missing a checksum/);
+	});
+
+	it('survives URL round-trips and tryDecompress fallback', async () => {
+		const engine = createClient.createWebShareEngine({ checksum: true });
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/');
+		expect(await engine.decompressFromUrl(url)).toEqual(sample);
+
+		const fallback = { ok: false };
+		expect(await engine.tryDecompress('1.raw.bogus.zzzzzzz', fallback)).toEqual(fallback);
+	});
+
+	it('does not affect engines without the option and rejects bad config', async () => {
+		const engine = createClient.createWebShareEngine();
+		expect(engine.checksum).toBe(false);
+		const token = await engine.compress(sample);
+		expect(token.split('.').length).toBe(3);
+
+		expect(() =>
+			createClient.createEngine({ codecs: ['raw'], checksum: true, alwaysPrefix: false })
+		).toThrow(/checksum requires prefixed tokens/);
+	});
+
+	it('defaults a single-codec checksum engine to prefixed tokens', async () => {
+		const engine = createClient.createEngine({ codecs: ['raw'], checksum: true });
+		const token = await engine.compress(sample);
+		expect(token.startsWith('1.raw.')).toBe(true);
+		expect(await engine.decompress(token)).toEqual(sample);
+	});
+});
+
+describe('maxUrlLength guard', () => {
+	const sample = { data: 'x'.repeat(200) };
+
+	it('throws when the built URL exceeds maxUrlLength', async () => {
+		const engine = createClient.createWebShareEngine();
+		await expect(
+			engine.compressToUrl(sample, 'https://app.example.com/', { maxUrlLength: 50 })
+		).rejects.toThrow(/exceeds maxUrlLength/);
+	});
+
+	it('passes when the URL fits and rejects invalid limits', async () => {
+		const engine = createClient.createWebShareEngine();
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/', {
+			maxUrlLength: 10000
+		});
+		expect(url.length).toBeLessThanOrEqual(10000);
+
+		await expect(
+			engine.compressToUrl(sample, 'https://app.example.com/', { maxUrlLength: -1 })
+		).rejects.toThrow(/positive finite number/);
+	});
+});
+
+describe('number precision transform', () => {
+	it('rounds floats recursively while leaving other values alone', async () => {
+		const transform = createClient.createNumberPrecisionTransform({ decimals: 2 });
+		const encoded = await transform.encode!({
+			pi: 3.14159265,
+			coords: [12.000001, -45.6789],
+			count: 7,
+			label: 'x',
+			nested: { ratio: 0.333333 },
+			weird: [Infinity, NaN]
+		});
+
+		expect(encoded).toEqual({
+			pi: 3.14,
+			coords: [12, -45.68],
+			count: 7,
+			label: 'x',
+			nested: { ratio: 0.33 },
+			weird: [Infinity, NaN]
+		});
+	});
+
+	it('shrinks tokens through an engine', async () => {
+		const noisy = {
+			points: Array.from({ length: 20 }, (_, i) => ({
+				x: i + 0.123456789012345,
+				y: i * 1.987654321098765
+			}))
+		};
+
+		const plain = createClient.createEngine({ codecs: ['raw'] });
+		const trimmed = createClient.createEngine({
+			codecs: ['raw'],
+			transforms: [createClient.createNumberPrecisionTransform({ decimals: 3 })]
+		});
+
+		const plainToken = await plain.compress(noisy);
+		const trimmedToken = await trimmed.compress(noisy);
+		expect(trimmedToken.length).toBeLessThan(plainToken.length);
+
+		const decoded = await trimmed.decompress(trimmedToken) as typeof noisy;
+		expect(decoded.points[1].x).toBe(1.123);
+	});
+
+	it('rejects invalid decimals', () => {
+		expect(() => createClient.createNumberPrecisionTransform({ decimals: -1 })).toThrow(
+			/between 0 and 15/
+		);
+		expect(() => createClient.createNumberPrecisionTransform({ decimals: 1.5 })).toThrow(
+			/between 0 and 15/
+		);
+		expect(() =>
+			createClient.createNumberPrecisionTransform({ decimals: 16 })
+		).toThrow(/between 0 and 15/);
+	});
+});

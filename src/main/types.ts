@@ -35,11 +35,17 @@ export interface KeyMapTransformOptions {
 	keys: Record<string, string>;
 }
 
+export interface NumberPrecisionTransformOptions {
+	id?: string;
+	decimals: number;
+}
+
 export type UrlShareLocation = 'query' | 'hash';
 
 export interface UrlShareOptions {
 	param?: string;
 	location?: UrlShareLocation;
+	maxUrlLength?: number;
 }
 
 export interface CodecCandidateStats {
@@ -100,6 +106,7 @@ export interface CreateEngineOptions extends CreateNamedCodecOptions {
 	skipUnsupportedCodecs?: boolean;
 	defaultCodec?: string;
 	plainTextThreshold?: number;
+	checksum?: boolean;
 }
 
 export interface NamedCodecClient<TValue = JsonUrlValue> {
@@ -120,6 +127,7 @@ export interface EngineClient<TValue = JsonUrlValue> {
 	transforms: string[];
 	skipUnsupportedCodecs: boolean;
 	plainTextThreshold: number;
+	checksum: boolean;
 	compress(value: TValue): Promise<string>;
 	compressConditional(value: TValue): Promise<string | null>;
 	compressBest(value: TValue): Promise<EngineCompressResult>;
@@ -142,6 +150,7 @@ export interface JsonUrlFactory {
 	defaultWebShareVersion: string;
 	createReferenceTransform<TValue = JsonUrlValue>(options: ReferenceTransformOptions<TValue>): ShareTransform;
 	createKeyMapTransform(options: KeyMapTransformOptions): ShareTransform;
+	createNumberPrecisionTransform(options: NumberPrecisionTransformOptions): ShareTransform;
 	buildShareUrl(baseUrl: string, token: string, options?: UrlShareOptions): string;
 	extractTokenFromUrl(url: string, options?: UrlShareOptions): string | null;
 	createEngine<TValue = JsonUrlValue>(options?: CreateEngineOptions): EngineClient<TValue>;

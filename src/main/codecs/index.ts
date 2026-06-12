@@ -14,6 +14,8 @@ const ALGORITHMS: Record<string, CodecAlgorithmLoader> = {
 	zl: async () => (await import('./zl.js')).default,
 	br: async () => (await import('./br.js')).default,
 	hbr: async () => (await import('./hbr.js')).default,
+	pbr: async () => (await import('./pbr.js')).default,
+	pdf: async () => (await import('./pdf.js')).default,
 	lz: async () => (await import('./lz.js')).default
 };
 
