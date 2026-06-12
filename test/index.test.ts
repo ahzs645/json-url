@@ -767,3 +767,178 @@ describe('custom codec in engine', () => {
 		expect(decompressed).toEqual(sample);
 	});
 });
+
+describe('url helpers', () => {
+	const sample = { shared: true, items: [1, 2, 3], note: 'hello world' };
+
+	it('round-trips through a query parameter on an engine', async () => {
+		const engine = createClient.createWebShareEngine();
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/share');
+
+		const parsed = new URL(url);
+		expect(parsed.searchParams.get('data')).toBeTruthy();
+
+		const decoded = await engine.decompressFromUrl(url);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('round-trips through a hash fragment with a custom param', async () => {
+		const engine = createClient.createWebShareEngine();
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/share', {
+			param: 's',
+			location: 'hash'
+		});
+
+		expect(new URL(url).hash.startsWith('#s=')).toBe(true);
+
+		const decoded = await engine.decompressFromUrl(url, { param: 's' });
+		expect(decoded).toEqual(sample);
+	});
+
+	it('round-trips on a named codec client', async () => {
+		const codec = createClient('lzstring');
+		const url = await codec.compressToUrl(sample, 'https://app.example.com/');
+		const decoded = await codec.decompressFromUrl(url);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('round-trips the lz codec through URL serialization', async () => {
+		const engine = createClient.createEngine({ codecs: ['lz'] });
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/');
+		const decoded = await engine.decompressFromUrl(url);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('preserves existing query parameters and hash params', async () => {
+		const engine = createClient.createWebShareEngine();
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/?lang=en#tab=settings', {
+			location: 'hash'
+		});
+
+		const parsed = new URL(url);
+		expect(parsed.searchParams.get('lang')).toBe('en');
+		const hashParams = new URLSearchParams(parsed.hash.slice(1));
+		expect(hashParams.get('tab')).toBe('settings');
+		expect(hashParams.get('data')).toBeTruthy();
+
+		const decoded = await engine.decompressFromUrl(url);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('finds the token in the hash without a location hint', async () => {
+		const engine = createClient.createWebShareEngine();
+		const url = await engine.compressToUrl(sample, 'https://app.example.com/', { location: 'hash' });
+		const decoded = await engine.decompressFromUrl(url);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('throws when the parameter is missing and supports try fallback', async () => {
+		const engine = createClient.createWebShareEngine();
+		await expect(engine.decompressFromUrl('https://app.example.com/')).rejects.toThrow(
+			/No token found/
+		);
+
+		const fallback = { ok: false };
+		expect(await engine.tryDecompressFromUrl('https://app.example.com/', fallback)).toEqual(fallback);
+		expect(await engine.tryDecompressFromUrl('not a url', fallback)).toEqual(fallback);
+		expect(
+			await engine.tryDecompressFromUrl('https://app.example.com/?data=%7Bbad', fallback)
+		).toEqual(fallback);
+	});
+
+	it('rejects invalid base URLs and option values', async () => {
+		const engine = createClient.createWebShareEngine();
+		await expect(engine.compressToUrl(sample, 'not a url')).rejects.toThrow(/absolute URL/);
+		await expect(
+			engine.compressToUrl(sample, 'https://app.example.com/', { param: '  ' })
+		).rejects.toThrow(/non-empty string/);
+		await expect(
+			engine.compressToUrl(sample, 'https://app.example.com/', {
+				location: 'path' as unknown as 'query'
+			})
+		).rejects.toThrow(/"query" or "hash"/);
+	});
+
+	it('exposes buildShareUrl and extractTokenFromUrl as standalone helpers', () => {
+		const url = createClient.buildShareUrl('https://app.example.com/', '1.raw.eyJvayI6dHJ1ZX0');
+		expect(createClient.extractTokenFromUrl(url)).toBe('1.raw.eyJvayI6dHJ1ZX0');
+		expect(createClient.extractTokenFromUrl('https://app.example.com/')).toBeNull();
+	});
+});
+
+describe('key map transform', () => {
+	const keys = {
+		builderName: 'bn',
+		builderFields: 'bf',
+		fieldLabel: 'fl'
+	};
+
+	it('shortens known keys recursively and restores them on decode', async () => {
+		const engine = createClient.createWebShareEngine({
+			transforms: [createClient.createKeyMapTransform({ keys })]
+		});
+
+		const sample = {
+			builderName: 'MoCA Blind',
+			builderFields: [
+				{ fieldLabel: 'Name', value: 'a' },
+				{ fieldLabel: 'Score', nested: { builderName: 'inner' } }
+			],
+			untouched: true
+		};
+
+		const token = await engine.compress(sample);
+		const decoded = await engine.decompress(token);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('produces shorter raw codec tokens than the untransformed payload', async () => {
+		const plain = createClient.createEngine({ codecs: ['raw'] });
+		const mapped = createClient.createEngine({
+			codecs: ['raw'],
+			transforms: [createClient.createKeyMapTransform({ keys })]
+		});
+
+		const sample = {
+			builderFields: Array.from({ length: 10 }, (_, i) => ({ fieldLabel: `Field ${i}` }))
+		};
+
+		const plainToken = await plain.compress(sample);
+		const mappedToken = await mapped.compress(sample);
+		expect(mappedToken.length).toBeLessThan(plainToken.length);
+	});
+
+	it('works standalone in both directions', async () => {
+		const transform = createClient.createKeyMapTransform({ keys });
+		const encoded = await transform.encode!({ builderName: 'x', list: [{ fieldLabel: 'y' }] });
+		expect(encoded).toEqual({ bn: 'x', list: [{ fl: 'y' }] });
+
+		const decoded = await transform.decode!(encoded);
+		expect(decoded).toEqual({ builderName: 'x', list: [{ fieldLabel: 'y' }] });
+	});
+
+	it('throws when renaming would collide with an existing key', async () => {
+		const transform = createClient.createKeyMapTransform({ keys });
+		await expect(async () =>
+			transform.encode!({ builderName: 'x', bn: 'y' })
+		).rejects.toThrow(/duplicate key "bn"/);
+	});
+
+	it('rejects invalid mappings', () => {
+		expect(() =>
+			createClient.createKeyMapTransform({ keys: { a: 'a' } })
+		).toThrow(/maps to itself/);
+		expect(() =>
+			createClient.createKeyMapTransform({ keys: { a: 'c', b: 'c' } })
+		).toThrow(/Duplicate key map transform short key/);
+		expect(() =>
+			createClient.createKeyMapTransform({ keys: { a: 'b', b: 'c' } })
+		).toThrow(/must not chain/);
+		expect(() =>
+			createClient.createKeyMapTransform({ keys: { a: '' } })
+		).toThrow(/non-empty string/);
+		expect(() =>
+			createClient.createKeyMapTransform({ keys: [] as unknown as Record<string, string> })
+		).toThrow(/must be an object/);
+	});
+});

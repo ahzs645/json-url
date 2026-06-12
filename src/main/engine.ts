@@ -4,6 +4,7 @@ import ALGORITHMS from './codecs/index.js';
 import { createUnsupportedCodecError } from './codecs/stream-codec.js';
 import CORE_LOADERS from './core-loaders.js';
 import { prepareEncodedInput } from './decode-utils.js';
+import { DEFAULT_URL_PARAM, buildShareUrl, extractTokenFromUrl } from './url-utils.js';
 
 import type {
 	CodecAlgorithmConfig,
@@ -17,7 +18,8 @@ import type {
 	NamedCodecStats,
 	ShareCodecDefinition,
 	ShareTransform,
-	SkippedCodecStat
+	SkippedCodecStat,
+	UrlShareOptions
 } from './types.js';
 import type { CodecAlgorithmLoader } from './codecs/index.js';
 
@@ -279,6 +281,42 @@ function normalizeCodecSpec(codec: string | ShareCodecDefinition, index: number)
 	};
 }
 
+function createUrlMethods<TValue>(
+	compress: (json: TValue) => Promise<string>,
+	decompress: (token: string, options?: { deURI?: boolean }) => Promise<TValue>
+) {
+	async function compressToUrl(
+		json: TValue,
+		baseUrl: string,
+		options: UrlShareOptions = {}
+	): Promise<string> {
+		const token = await compress(json);
+		return buildShareUrl(baseUrl, token, options);
+	}
+
+	async function decompressFromUrl(url: string, options: UrlShareOptions = {}): Promise<TValue> {
+		const token = extractTokenFromUrl(url, options);
+		if (token === null) {
+			throw new Error(`No token found in URL parameter "${options.param ?? DEFAULT_URL_PARAM}"`);
+		}
+		return decompress(token, { deURI: true });
+	}
+
+	async function tryDecompressFromUrl(
+		url: string,
+		fallback: TValue,
+		options: UrlShareOptions = {}
+	): Promise<TValue> {
+		try {
+			return await decompressFromUrl(url, options);
+		} catch {
+			return fallback;
+		}
+	}
+
+	return { compressToUrl, decompressFromUrl, tryDecompressFromUrl };
+}
+
 function isUnsupportedCodecError(error: unknown): error is Error & { code: string } {
 	return Boolean(error) && typeof error === 'object' && (error as { code?: string }).code === 'ERR_UNSUPPORTED_CODEC';
 }
@@ -365,7 +403,8 @@ export function createNamedCodec<TValue = JsonUrlValue>(
 		decompress,
 		tryDecompress,
 		stats,
-		transforms: transformIds
+		transforms: transformIds,
+		...createUrlMethods(compress, decompress)
 	};
 }
 
@@ -583,7 +622,8 @@ export function createEngine<TValue = JsonUrlValue>(
 		decompress,
 		tryDecompress,
 		tryDecodeToken: tryDecompress,
-		stats
+		stats,
+		...createUrlMethods(compress, decompress)
 	};
 }
 

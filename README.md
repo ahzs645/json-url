@@ -103,6 +103,50 @@ When a payload exactly matches a known preset, use `createReferenceTransform()` 
 	const decoded = await engine.decompress(token);
 ```
 
+### Key Map Transform
+
+When your payloads use long, well-known property names, `createKeyMapTransform()` reversibly shortens them before compression and restores them after decompression. Keys are renamed recursively through nested objects and arrays; unknown keys are left untouched.
+
+```
+	const JsonUrl = require('@firstform/json-url');
+
+	const engine = JsonUrl.createWebShareEngine({
+		transforms: [
+			JsonUrl.createKeyMapTransform({
+				keys: {
+					builderName: 'bn',
+					builderFields: 'bf',
+					fieldLabel: 'fl'
+				}
+			})
+		]
+	});
+```
+
+Mappings are validated up front: short keys must be unique, must not equal their long key, and must not chain (a short key cannot also appear as a long key). If renaming would collide with a key already present on an object, the transform throws instead of silently corrupting data.
+
+### URL Helpers
+
+Every codec and engine can read and write tokens directly on a URL, so you don't have to wire up `URLSearchParams` yourself. Tokens go into a query parameter (default name `data`) or into the hash fragment.
+
+```
+	const engine = JsonUrl.createWebShareEngine();
+
+	const url = await engine.compressToUrl(state, 'https://app.example.com/share');
+	// https://app.example.com/share?data=1.br....
+
+	const hashUrl = await engine.compressToUrl(state, 'https://app.example.com/share', {
+		param: 's',
+		location: 'hash'
+	});
+	// https://app.example.com/share#s=1.br....
+
+	const restored = await engine.decompressFromUrl(url);
+	const safe = await engine.tryDecompressFromUrl(window.location.href, defaultState);
+```
+
+`decompressFromUrl()` checks the query string first and falls back to the hash fragment unless you pass an explicit `location`. Existing query parameters and hash params on the URL are preserved. The standalone helpers `JsonUrl.buildShareUrl(baseUrl, token, options)` and `JsonUrl.extractTokenFromUrl(url, options)` are also exported if you only need the URL plumbing.
+
 ### Multi-codec Engine
 
 When you want to test multiple codecs and keep the shortest token, use `createEngine`. Tokens are prefixed as `version.codec.payload`, so the engine can auto-detect the codec when decoding.
@@ -223,6 +267,8 @@ To see it in action, download the source code and run `npm run example`, or simp
 * `JsonUrl.createEngine()` can test multiple codecs, apply reversible transforms, and emit self-describing `version.codec.payload` tokens.
 * `JsonUrl.createWebShareEngine()` is a preset for `raw/gz/df/zl/br/lz` with `version: "1"` and `maxLength: 12000`.
 * `JsonUrl.cleanEncodedInput()` removes percent-encoding and ignorable whitespace before decode.
+* `JsonUrl.createKeyMapTransform()` reversibly shortens well-known object keys before compression.
+* Codecs and engines expose `compressToUrl()` / `decompressFromUrl()` / `tryDecompressFromUrl()` for reading and writing tokens directly on URLs.
 
 ## Package Layout
 

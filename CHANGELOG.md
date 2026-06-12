@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- URL helpers on codecs and engines: `compressToUrl()`, `decompressFromUrl()` and
+  `tryDecompressFromUrl()` write/read share tokens directly to a query parameter
+  (default `data`) or hash fragment of a URL
+- Standalone `buildShareUrl()` / `extractTokenFromUrl()` utility exports
+- `createKeyMapTransform()` for reversible key shortening (e.g. `builderName` → `bn`)
+  applied recursively before compression and restored after decompression
+
 ## [4.1.0] - 2024-12-01
 
 ### Added

@@ -30,6 +30,18 @@ export interface ReferenceTransformOptions<TValue = JsonUrlValue> {
 	clone?: (value: TValue) => TValue;
 }
 
+export interface KeyMapTransformOptions {
+	id?: string;
+	keys: Record<string, string>;
+}
+
+export type UrlShareLocation = 'query' | 'hash';
+
+export interface UrlShareOptions {
+	param?: string;
+	location?: UrlShareLocation;
+}
+
 export interface CodecCandidateStats {
 	codec: string;
 	token: string;
@@ -94,8 +106,11 @@ export interface NamedCodecClient<TValue = JsonUrlValue> {
 	id: string;
 	transforms: string[];
 	compress(value: TValue): Promise<string>;
+	compressToUrl(value: TValue, baseUrl: string, options?: UrlShareOptions): Promise<string>;
 	decompress(token: string, options?: DecodeOptions): Promise<TValue>;
+	decompressFromUrl(url: string, options?: UrlShareOptions): Promise<TValue>;
 	tryDecompress(token: string, fallback: TValue, options?: DecodeOptions): Promise<TValue>;
+	tryDecompressFromUrl(url: string, fallback: TValue, options?: UrlShareOptions): Promise<TValue>;
 	stats(value: TValue): Promise<NamedCodecStats>;
 }
 
@@ -109,9 +124,12 @@ export interface EngineClient<TValue = JsonUrlValue> {
 	compressConditional(value: TValue): Promise<string | null>;
 	compressBest(value: TValue): Promise<EngineCompressResult>;
 	compressDetailed(value: TValue): Promise<EngineCompressResult>;
+	compressToUrl(value: TValue, baseUrl: string, options?: UrlShareOptions): Promise<string>;
 	decompress(token: string, options?: DecodeOptions): Promise<TValue>;
+	decompressFromUrl(url: string, options?: UrlShareOptions): Promise<TValue>;
 	tryDecompress(token: string, fallback: TValue, options?: DecodeOptions): Promise<TValue>;
 	tryDecodeToken(token: string, fallback: TValue, options?: DecodeOptions): Promise<TValue>;
+	tryDecompressFromUrl(url: string, fallback: TValue, options?: UrlShareOptions): Promise<TValue>;
 	stats(value: TValue): Promise<EngineCompressResult>;
 }
 
@@ -123,6 +141,9 @@ export interface JsonUrlFactory {
 	defaultWebShareMaxLength: number;
 	defaultWebShareVersion: string;
 	createReferenceTransform<TValue = JsonUrlValue>(options: ReferenceTransformOptions<TValue>): ShareTransform;
+	createKeyMapTransform(options: KeyMapTransformOptions): ShareTransform;
+	buildShareUrl(baseUrl: string, token: string, options?: UrlShareOptions): string;
+	extractTokenFromUrl(url: string, options?: UrlShareOptions): string | null;
 	createEngine<TValue = JsonUrlValue>(options?: CreateEngineOptions): EngineClient<TValue>;
 	createNamedCodec<TValue = JsonUrlValue>(algorithm: string, options?: CreateNamedCodecOptions): NamedCodecClient<TValue>;
 	createWebShareEngine<TValue = JsonUrlValue>(options?: CreateEngineOptions): EngineClient<TValue>;
