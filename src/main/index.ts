@@ -1,7 +1,9 @@
 import { cleanEncodedInput } from './decode-utils.js';
+import { createDefaultsTransform } from './defaults-transform.js';
 import { createKeyMapTransform } from './key-map-transform.js';
 import { createNumberPrecisionTransform } from './number-precision-transform.js';
 import { createReferenceTransform } from './reference-transform.js';
+import { createResolverReferenceTransform } from './resolver-reference-transform.js';
 import { buildShareUrl, extractTokenFromUrl } from './url-utils.js';
 import {
 	AVAILABLE_CODECS,
@@ -26,7 +28,9 @@ const createClient = Object.assign(
 		defaultWebShareMaxLength: DEFAULT_WEB_SHARE_MAX_LENGTH,
 		defaultWebShareVersion: DEFAULT_WEB_SHARE_VERSION,
 		createReferenceTransform,
+		createResolverReferenceTransform,
 		createKeyMapTransform,
+		createDefaultsTransform,
 		createNumberPrecisionTransform,
 		buildShareUrl,
 		extractTokenFromUrl,
@@ -42,6 +46,9 @@ export type {
 	CreateEngineOptions,
 	CreateNamedCodecOptions,
 	DecodeOptions,
+	DefaultsRule,
+	DefaultsTransformOptions,
+	DefaultValue,
 	EngineClient,
 	EngineCompressResult,
 	JsonUrlFactory,
@@ -52,6 +59,7 @@ export type {
 	NumberPrecisionTransformOptions,
 	ReferenceTransformEntry,
 	ReferenceTransformOptions,
+	ResolverReferenceTransformOptions,
 	ShareCodecDefinition,
 	ShareTransform,
 	UrlShareLocation,

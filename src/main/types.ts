@@ -35,6 +35,48 @@ export interface KeyMapTransformOptions {
 	keys: Record<string, string>;
 }
 
+export type DefaultValue = JsonUrlValue | ((node: Record<string, unknown>) => JsonUrlValue);
+
+export interface DefaultsRule {
+	/**
+	 * Record nodes this rule applies to. Omit to apply to the top-level value
+	 * only (when it is a record). When provided, the rule runs on every record
+	 * node in the tree where `match(node)` returns true.
+	 */
+	match?: (node: Record<string, unknown>) => boolean;
+	/**
+	 * Map of key -> default value (or `(node) => default`). On encode a key whose
+	 * value is deep-equal to its default is stripped; on decode an absent key is
+	 * restored to a clone of its default. Use `{}` / `[]` defaults to prune/restore
+	 * empty containers.
+	 */
+	defaults: Record<string, DefaultValue>;
+}
+
+export interface DefaultsTransformOptions {
+	id?: string;
+	rules: DefaultsRule[];
+	/** Restore stripped defaults on decode. Default true; set false for encode-only (lossy) compaction. */
+	restore?: boolean;
+	/** Deep-equality used to decide whether a value matches its default. */
+	equals?: (a: JsonUrlValue, b: JsonUrlValue) => boolean;
+	/** Clone used when restoring a default so callers never share references. */
+	clone?: <TValue>(value: TValue) => TValue;
+}
+
+export interface ResolverReferenceTransformOptions {
+	id?: string;
+	/** Encode: identify an embedded record node that should be compacted to a reference. */
+	match: (node: Record<string, unknown>) => boolean;
+	/** Encode: produce the compact reference form of a matched node. */
+	toRef: (node: Record<string, unknown>) => JsonUrlValue;
+	/**
+	 * Decode: handed every record node; return a rehydrated replacement, or the
+	 * node unchanged when this resolver does not own that reference. May be async.
+	 */
+	fromRef: (node: Record<string, unknown>) => JsonUrlValue | Promise<JsonUrlValue>;
+}
+
 export interface NumberPrecisionTransformOptions {
 	id?: string;
 	decimals: number;
@@ -149,7 +191,9 @@ export interface JsonUrlFactory {
 	defaultWebShareMaxLength: number;
 	defaultWebShareVersion: string;
 	createReferenceTransform<TValue = JsonUrlValue>(options: ReferenceTransformOptions<TValue>): ShareTransform;
+	createResolverReferenceTransform(options: ResolverReferenceTransformOptions): ShareTransform;
 	createKeyMapTransform(options: KeyMapTransformOptions): ShareTransform;
+	createDefaultsTransform(options: DefaultsTransformOptions): ShareTransform;
 	createNumberPrecisionTransform(options: NumberPrecisionTransformOptions): ShareTransform;
 	buildShareUrl(baseUrl: string, token: string, options?: UrlShareOptions): string;
 	extractTokenFromUrl(url: string, options?: UrlShareOptions): string | null;

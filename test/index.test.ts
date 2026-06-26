@@ -943,6 +943,196 @@ describe('key map transform', () => {
 	});
 });
 
+describe('createDefaultsTransform', () => {
+	it('strips root-level defaults on encode and restores them on decode', async () => {
+		const transform = createClient.createDefaultsTransform({
+			rules: [
+				{
+					defaults: {
+						version: 1,
+						paginationEnabled: false,
+						pageCount: 1,
+						branchingRules: {},
+						fieldLinkRules: []
+					}
+				}
+			]
+		});
+
+		const full = {
+			version: 1,
+			builderName: 'Form',
+			paginationEnabled: false,
+			pageCount: 1,
+			branchingRules: {},
+			fieldLinkRules: [],
+			keep: 'me'
+		};
+
+		const encoded = (await transform.encode!(full)) as Record<string, unknown>;
+		expect(encoded).toEqual({ builderName: 'Form', keep: 'me' });
+
+		const decoded = await transform.decode!(encoded);
+		expect(decoded).toEqual(full);
+	});
+
+	it('keeps non-default values untouched', async () => {
+		const transform = createClient.createDefaultsTransform({
+			rules: [{ defaults: { pageCount: 1, paginationEnabled: false } }]
+		});
+		const encoded = (await transform.encode!({ pageCount: 3, paginationEnabled: true })) as Record<
+			string,
+			unknown
+		>;
+		expect(encoded).toEqual({ pageCount: 3, paginationEnabled: true });
+	});
+
+	it('applies node rules to every matching record via a match predicate', async () => {
+		const transform = createClient.createDefaultsTransform({
+			rules: [
+				{
+					match: (node) => typeof node.type === 'string' && typeof node.id === 'string',
+					defaults: { required: false, hidden: false }
+				}
+			]
+		});
+
+		const sample = {
+			builderFields: [
+				{ id: 'a', type: 'text', required: false, hidden: false, label: 'A' },
+				{ id: 'b', type: 'text', required: true, hidden: false, label: 'B' }
+			],
+			// not a field node — must be left alone even though it has a required key
+			meta: { required: false }
+		};
+
+		const encoded = (await transform.encode!(sample)) as typeof sample;
+		expect(encoded.builderFields[0]).toEqual({ id: 'a', type: 'text', label: 'A' });
+		expect(encoded.builderFields[1]).toEqual({ id: 'b', type: 'text', required: true, label: 'B' });
+		expect(encoded.meta).toEqual({ required: false });
+
+		const decoded = await transform.decode!(encoded);
+		expect(decoded).toEqual(sample);
+	});
+
+	it('supports function-valued defaults resolved from the node', async () => {
+		const transform = createClient.createDefaultsTransform({
+			rules: [
+				{
+					match: (node) => node.kind === 'opt',
+					defaults: { value: (node: Record<string, unknown>) => node.label }
+				}
+			]
+		});
+
+		const encoded = (await transform.encode!({ kind: 'opt', label: 'Yes', value: 'Yes' })) as Record<
+			string,
+			unknown
+		>;
+		expect(encoded).toEqual({ kind: 'opt', label: 'Yes' });
+		const decoded = await transform.decode!(encoded);
+		expect(decoded).toEqual({ kind: 'opt', label: 'Yes', value: 'Yes' });
+	});
+
+	it('round-trips through a web-share engine and shrinks the token', async () => {
+		const transform = createClient.createDefaultsTransform({
+			rules: [{ defaults: { paginationEnabled: false, pageCount: 1, branchingRules: {} } }]
+		});
+		const plain = createClient.createEngine({ codecs: ['raw'] });
+		const compact = createClient.createEngine({ codecs: ['raw'], transforms: [transform] });
+
+		const sample = { builderName: 'Form', paginationEnabled: false, pageCount: 1, branchingRules: {} };
+		const plainToken = await plain.compress(sample);
+		const compactToken = await compact.compress(sample);
+		expect(compactToken.length).toBeLessThan(plainToken.length);
+		expect(await compact.decompress(compactToken)).toEqual(sample);
+	});
+
+	it('omits the decode handler when restore is false (lossy)', () => {
+		const transform = createClient.createDefaultsTransform({
+			restore: false,
+			rules: [{ defaults: { a: 1 } }]
+		});
+		expect(typeof transform.encode).toBe('function');
+		expect(transform.decode).toBeUndefined();
+	});
+
+	it('throws when rules are missing or malformed', () => {
+		expect(() =>
+			createClient.createDefaultsTransform({} as never)
+		).toThrow(/rules array/);
+		expect(() =>
+			createClient.createDefaultsTransform({ rules: [{} as never] })
+		).toThrow(/defaults object/);
+	});
+});
+
+describe('createResolverReferenceTransform', () => {
+	const library: Record<string, Record<string, unknown>> = {
+		map_1: { image: 'data:svg', hotspots: [{ x: 1 }, { x: 2 }] }
+	};
+
+	function makeTransform() {
+		return createClient.createResolverReferenceTransform({
+			id: 'hotspot-ref',
+			match: (node) => node.kind === 'hotspot' && typeof node.image === 'string',
+			toRef: (node) => ({ kind: 'hotspot', mapRef: node.mapId }),
+			fromRef: (node) => {
+				if (node.kind !== 'hotspot' || typeof node.mapRef !== 'string') return node;
+				return { kind: 'hotspot', mapId: node.mapRef, ...library[node.mapRef] };
+			}
+		});
+	}
+
+	it('compacts an embedded node to a reference and rehydrates it', async () => {
+		const transform = makeTransform();
+		const embedded = {
+			fields: [
+				{ kind: 'hotspot', mapId: 'map_1', image: 'data:svg', hotspots: [{ x: 1 }, { x: 2 }] },
+				{ kind: 'text', label: 'Untouched' }
+			]
+		};
+
+		const encoded = (await transform.encode!(embedded)) as { fields: Array<Record<string, unknown>> };
+		expect(encoded.fields[0]).toEqual({ kind: 'hotspot', mapRef: 'map_1' });
+		expect(encoded.fields[1]).toEqual({ kind: 'text', label: 'Untouched' });
+
+		const decoded = await transform.decode!(encoded);
+		expect(decoded).toEqual(embedded);
+	});
+
+	it('supports async resolvers', async () => {
+		const transform = createClient.createResolverReferenceTransform({
+			match: (node) => node.kind === 'hotspot' && typeof node.image === 'string',
+			toRef: (node) => ({ kind: 'hotspot', mapRef: node.mapId }),
+			fromRef: async (node) => {
+				if (node.kind !== 'hotspot' || typeof node.mapRef !== 'string') return node;
+				await Promise.resolve();
+				return { kind: 'hotspot', mapId: node.mapRef, ...library[node.mapRef as string] };
+			}
+		});
+
+		const token = 'map_1';
+		const decoded = await transform.decode!({ kind: 'hotspot', mapRef: token });
+		expect(decoded).toEqual({ kind: 'hotspot', mapId: 'map_1', image: 'data:svg', hotspots: [{ x: 1 }, { x: 2 }] });
+	});
+
+	it('round-trips through a web-share engine', async () => {
+		const engine = createClient.createWebShareEngine({ transforms: [makeTransform()] });
+		const sample = {
+			fields: [{ kind: 'hotspot', mapId: 'map_1', image: 'data:svg', hotspots: [{ x: 1 }, { x: 2 }] }]
+		};
+		const token = await engine.compress(sample);
+		expect(await engine.decompress(token)).toEqual(sample);
+	});
+
+	it('throws when required handlers are missing', () => {
+		expect(() =>
+			createClient.createResolverReferenceTransform({ match: () => true } as never)
+		).toThrow(/match and toRef/);
+	});
+});
+
 describe('packed binary codecs (pbr, pdf)', () => {
 	const sample = {
 		builderName: 'MoCA Blind',

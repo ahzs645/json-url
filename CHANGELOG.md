@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `maxUrlLength` option on `compressToUrl()` / `buildShareUrl()` to reject URLs that
   exceed a length budget
 - `createNumberPrecisionTransform()` for lossy rounding of float noise before encoding
+- `createDefaultsTransform()` for declarative, reversible default stripping: keys whose
+  value is deep-equal to a configured default are removed on encode and restored on
+  decode. Rules target the top-level value (no `match`) or any record node via a
+  `match` predicate; supports function-valued defaults and doubles as an empty-container
+  pruner (use `{}` / `[]` defaults)
+- `createResolverReferenceTransform()` for dynamic library references: compacts an
+  embedded node to a compact reference on encode (`match` / `toRef`) and rehydrates it
+  from a caller-supplied, possibly async resolver on decode (`fromRef`) — e.g. browser
+  library storage or a seed catalogue, complementing the fixed-dictionary
+  `createReferenceTransform()`
 
 ## [4.1.0] - 2024-12-01
 
