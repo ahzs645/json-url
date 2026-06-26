@@ -45,12 +45,27 @@ export interface DefaultsRule {
 	 */
 	match?: (node: Record<string, unknown>) => boolean;
 	/**
-	 * Map of key -> default value (or `(node) => default`). On encode a key whose
+	 * Dot-separated key path to descend into before applying defaults (e.g.
+	 * `"sectionConfig"` or `"sectionConfig.authorshipPolicy"`). The sub-object is
+	 * created on decode so its defaults can be restored. Omit to apply directly to
+	 * the matched node.
+	 */
+	into?: string;
+	/**
+	 * Map of key -> default value (or `(target) => default`). On encode a key whose
 	 * value is deep-equal to its default is stripped; on decode an absent key is
 	 * restored to a clone of its default. Use `{}` / `[]` defaults to prune/restore
 	 * empty containers.
 	 */
 	defaults: Record<string, DefaultValue>;
+	/** When the `into` sub-object becomes empty after stripping, drop it entirely on encode. */
+	pruneEmptyInto?: boolean;
+	/**
+	 * Encode-only predicate over the `into` sub-object. When it returns true the
+	 * whole sub-object is dropped (rather than stripping individual keys); decode
+	 * restores it in full from `defaults`. Requires `into`.
+	 */
+	dropWhen?: (target: Record<string, unknown>) => boolean;
 }
 
 export interface DefaultsTransformOptions {

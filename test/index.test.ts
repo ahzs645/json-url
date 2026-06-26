@@ -482,6 +482,25 @@ describe('homogeneous codecs', () => {
 
 			expect(decompressed).toEqual(sample);
 		});
+
+		it(`leaves unpacked sibling arrays at a shared path intact with ${algorithm}`, async () => {
+			const codec = createClient(algorithm);
+			// `fields[].options` all live at schema path "fields/options". The first packs
+			// (large + homogeneous), the others do not (too small / heterogeneous). Decode
+			// must only unpack the one that was actually packed, not its raw siblings.
+			const sample = {
+				fields: [
+					{ id: 'a', options: Array.from({ length: 40 }, (_, i) => ({ key: `k${i}`, score: i })) },
+					{ id: 'b', options: [{ key: 'x', score: 1 }] },
+					{ id: 'c', options: [{ key: 'y' }, { score: 2 }] }
+				]
+			};
+
+			const compressed = await codec.compress(sample);
+			const decompressed = await codec.decompress(compressed);
+
+			expect(decompressed).toEqual(sample);
+		});
 	}
 
 	it('lets the engine prefer hgz over gz when packing helps', async () => {
@@ -1057,6 +1076,90 @@ describe('createDefaultsTransform', () => {
 		expect(transform.decode).toBeUndefined();
 	});
 
+	it('strips and restores defaults inside an `into` sub-object, creating it on decode', async () => {
+		const transform = createClient.createDefaultsTransform({
+			rules: [
+				{
+					match: (node) => node.type === 'textarea',
+					into: 'textareaConfig',
+					defaults: { rows: 4, multiline: true }
+				}
+			]
+		});
+
+		// All-default config is stripped to nothing on encode...
+		const encoded = (await transform.encode!({
+			type: 'textarea',
+			textareaConfig: { rows: 4, multiline: true }
+		})) as Record<string, unknown>;
+		expect(encoded).toEqual({ type: 'textarea', textareaConfig: {} });
+
+		// ...and a missing config is recreated and filled on decode.
+		const decoded = await transform.decode!({ type: 'textarea' });
+		expect(decoded).toEqual({ type: 'textarea', textareaConfig: { rows: 4, multiline: true } });
+
+		// Non-default values survive.
+		const kept = (await transform.encode!({
+			type: 'textarea',
+			textareaConfig: { rows: 8, multiline: true }
+		})) as Record<string, unknown>;
+		expect(kept).toEqual({ type: 'textarea', textareaConfig: { rows: 8 } });
+	});
+
+	it('drops a whole sub-object via dropWhen and restores it in full on decode', async () => {
+		const transform = createClient.createDefaultsTransform({
+			rules: [
+				{
+					match: (node) => node.type === 'section',
+					into: 'sectionConfig.authorshipPolicy',
+					dropWhen: (policy) => policy.enabled === false,
+					defaults: { enabled: false, granularity: 'field', lockOn: 'save' }
+				}
+			]
+		});
+
+		// Disabled policy → the entire authorshipPolicy object is dropped.
+		const encoded = (await transform.encode!({
+			type: 'section',
+			sectionConfig: { authorshipPolicy: { enabled: false, granularity: 'field', lockOn: 'save' } }
+		})) as { sectionConfig: Record<string, unknown> };
+		expect(encoded.sectionConfig.authorshipPolicy).toBeUndefined();
+
+		// Decode restores the full default object.
+		const decoded = (await transform.decode!(encoded)) as { sectionConfig: { authorshipPolicy: unknown } };
+		expect(decoded.sectionConfig.authorshipPolicy).toEqual({
+			enabled: false,
+			granularity: 'field',
+			lockOn: 'save'
+		});
+
+		// Enabled policy is kept, with its own defaults stripped.
+		const enabled = (await transform.encode!({
+			type: 'section',
+			sectionConfig: { authorshipPolicy: { enabled: true, granularity: 'field', lockOn: 'save' } }
+		})) as { sectionConfig: { authorshipPolicy: Record<string, unknown> } };
+		expect(enabled.sectionConfig.authorshipPolicy).toEqual({ enabled: true });
+	});
+
+	it('prunes an emptied `into` sub-object when pruneEmptyInto is set', async () => {
+		const transform = createClient.createDefaultsTransform({
+			rules: [
+				{
+					match: (node) => node.type === 'section',
+					into: 'sectionConfig',
+					pruneEmptyInto: true,
+					defaults: { gridColumns: 2 }
+				}
+			]
+		});
+
+		const encoded = (await transform.encode!({
+			type: 'section',
+			sectionConfig: { gridColumns: 2 }
+		})) as Record<string, unknown>;
+		expect(encoded).toEqual({ type: 'section' });
+	});
+
 	it('throws when rules are missing or malformed', () => {
 		expect(() =>
 			createClient.createDefaultsTransform({} as never)
@@ -1064,6 +1167,9 @@ describe('createDefaultsTransform', () => {
 		expect(() =>
 			createClient.createDefaultsTransform({ rules: [{} as never] })
 		).toThrow(/defaults object/);
+		expect(() =>
+			createClient.createDefaultsTransform({ rules: [{ dropWhen: () => true, defaults: { a: 1 } } as never] })
+		).toThrow(/dropWhen requires an into path/);
 	});
 });
 

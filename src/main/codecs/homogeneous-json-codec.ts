@@ -4,6 +4,14 @@ import type { CodecAlgorithmConfig } from '../types.js';
 const RAW_PREFIX = 'HP0:';
 const PACKED_PREFIX = 'HP1:';
 
+// Self-identifying marker placed at index 0 of a packed homogeneous array. The schema
+// records *paths* that contain at least one packed array, but sibling arrays at the same
+// path may not have been packed (packing is conditional on shrinking the payload). The
+// sentinel lets unpack tell a packed array from an unpacked sibling and skip the latter
+// instead of misreading its first elements as a header. The NUL prefix never occurs in
+// real JSON form data.
+const PACK_SENTINEL = "\u0000hp";
+
 interface PackedEnvelope {
 	schema: string[];
 	data: unknown;
@@ -70,9 +78,11 @@ function isHomogeneousObjectArray(value: unknown): value is Array<Record<string,
 
 function packHomogeneousArray(value: Array<Record<string, unknown>>): unknown[] {
 	const keys = value.length > 0 ? Object.keys(value[0]) : [];
-	const packed = new Array<unknown>(2 + keys.length + value.length * keys.length);
+	const packed = new Array<unknown>(3 + keys.length + value.length * keys.length);
 	let offset = 0;
 
+	packed[offset] = PACK_SENTINEL;
+	offset += 1;
 	packed[offset] = keys.length;
 	offset += 1;
 	packed[offset] = value.length;
@@ -93,13 +103,19 @@ function packHomogeneousArray(value: Array<Record<string, unknown>>): unknown[] 
 	return packed;
 }
 
-function unpackHomogeneousArray(value: unknown): Array<Record<string, unknown>> {
-	if (!Array.isArray(value) || value.length < 2) {
-		throw new Error('Expected packed homogeneous array payload');
+function isPackedHomogeneousArray(value: unknown): value is unknown[] {
+	return Array.isArray(value) && value.length >= 3 && value[0] === PACK_SENTINEL;
+}
+
+function unpackHomogeneousArray(value: unknown): unknown {
+	// Only unpack arrays we actually packed. A sibling array sharing the same schema
+	// path that was left unpacked (packing did not shrink it) is returned untouched.
+	if (!isPackedHomogeneousArray(value)) {
+		return value;
 	}
 
-	const keyCount = value[0];
-	const rowCount = value[1];
+	const keyCount = value[1];
+	const rowCount = value[2];
 	if (
 		typeof keyCount !== 'number' ||
 		typeof rowCount !== 'number' ||
@@ -111,18 +127,18 @@ function unpackHomogeneousArray(value: unknown): Array<Record<string, unknown>> 
 		throw new Error('Invalid packed homogeneous array header');
 	}
 
-	const expectedLength = 2 + keyCount + rowCount * keyCount;
+	const expectedLength = 3 + keyCount + rowCount * keyCount;
 	if (value.length !== expectedLength) {
 		throw new Error('Packed homogeneous array length mismatch');
 	}
 
-	const keys = value.slice(2, 2 + keyCount);
+	const keys = value.slice(3, 3 + keyCount);
 	if (!keys.every((key) => typeof key === 'string')) {
 		throw new Error('Packed homogeneous array keys must be strings');
 	}
 
 	const rows = new Array<Record<string, unknown>>(rowCount);
-	let offset = 2 + keyCount;
+	let offset = 3 + keyCount;
 	for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
 		const row: Record<string, unknown> = {};
 		for (const key of keys as string[]) {

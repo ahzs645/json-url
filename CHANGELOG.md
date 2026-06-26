@@ -32,6 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from a caller-supplied, possibly async resolver on decode (`fromRef`) — e.g. browser
   library storage or a seed catalogue, complementing the fixed-dictionary
   `createReferenceTransform()`
+- `createDefaultsTransform()` gained `into` (descend a dot-separated key path before
+  applying defaults; the sub-object is recreated on decode), `pruneEmptyInto` (drop an
+  emptied sub-object on encode), and `dropWhen` (drop a whole sub-object on encode and
+  restore it in full on decode) — enough to express nested/conditional config defaults
+
+### Fixed
+- Homogeneous-array codecs (`hgz`/`hbr`) no longer throw "Invalid packed homogeneous
+  array header" when sibling arrays share a schema path but only some were packed.
+  Packed arrays now carry a self-identifying sentinel so decode unpacks only the arrays
+  that were actually packed and leaves raw siblings untouched.
 
 ## [4.1.0] - 2024-12-01
 

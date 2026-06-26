@@ -125,6 +125,93 @@ When your payloads use long, well-known property names, `createKeyMapTransform()
 
 Mappings are validated up front: short keys must be unique, must not equal their long key, and must not chain (a short key cannot also appear as a long key). If renaming would collide with a key already present on an object, the transform throws instead of silently corrupting data.
 
+### Defaults Transform
+
+`createDefaultsTransform()` is the declarative replacement for hand-written `if (value === DEFAULT) delete value` / `value ??= DEFAULT` pairs. On encode it removes any key whose value is deep-equal to a configured default; on decode it restores an absent key to a clone of that default. Because stripping and restoring are exact inverses, the round-trip is lossless while the token only ever carries non-default data.
+
+A rule with no `match` applies to the top-level value only. A rule with `match` applies to every record node in the tree where the predicate returns true, so you supply a precise guard (typically keyed off a stable discriminator such as `type`) to avoid touching unrelated nodes.
+
+```
+	const JsonUrl = require('@firstform/json-url');
+
+	const engine = JsonUrl.createWebShareEngine({
+		transforms: [
+			JsonUrl.createDefaultsTransform({
+				rules: [
+					// Top-level defaults (no `match`): pruned on encode, restored on decode.
+					{
+						defaults: {
+							version: 1,
+							paginationEnabled: false,
+							pageCount: 1,
+							branchingRules: {}, // `{}` / `[]` defaults double as empty-container pruning
+							fieldLinkRules: []
+						}
+					},
+					// Node defaults: every record that looks like a field.
+					{
+						match: (node) => typeof node.id === 'string' && typeof node.type === 'string',
+						defaults: { required: false, hidden: false, visibility: { type: 'always' } }
+					}
+				]
+			})
+		]
+	});
+```
+
+A default may be a function of the node (`{ value: (node) => node.label }`) for "defaults to a sibling key" cases, and `restore: false` makes the transform encode-only (lossy compaction with nothing to restore). Apply a transform directly to a single object — `transform.encode(field)` / `transform.decode(field)` — when you want to reuse a rule per-array-element instead of letting it match across the whole tree.
+
+Rules can reach into nested config objects and express conditional drops:
+
+```
+	JsonUrl.createDefaultsTransform({
+		rules: [
+			// Defaults live in a sub-object; `into` descends a dot-path and recreates the
+			// sub-object on decode so its defaults can be restored.
+			{
+				match: (node) => node.type === 'textarea',
+				into: 'textareaConfig',
+				pruneEmptyInto: true, // drop textareaConfig entirely if it empties out
+				defaults: { rows: 4, multiline: true, resizable: true }
+			},
+			// `dropWhen` drops the whole sub-object on encode (here, a disabled policy is
+			// fully redundant) and restores it in full from `defaults` on decode.
+			{
+				match: (node) => node.type === 'section',
+				into: 'sectionConfig.authorshipPolicy',
+				dropWhen: (policy) => policy.enabled === false,
+				defaults: { enabled: false, granularity: 'field', lockOn: 'save' }
+			}
+		]
+	});
+```
+
+### Resolver Reference Transform
+
+`createResolverReferenceTransform()` compacts an embedded object down to a small reference on encode and rehydrates it from a caller-supplied resolver on decode. Unlike `createReferenceTransform()` (which swaps values against a fixed up-front dictionary), the resolver can read from anywhere — browser library storage, a seed catalogue, a remote service — and may be asynchronous. The recursive walk, match/skip plumbing, and async ordering live in the transform; you supply only the domain-specific `match` / `toRef` / `fromRef`.
+
+```
+	const engine = JsonUrl.createWebShareEngine({
+		transforms: [
+			JsonUrl.createResolverReferenceTransform({
+				id: 'library-ref',
+				// Encode: which embedded nodes to compact.
+				match: (node) => node.kind === 'hotspot' && typeof node.image === 'string',
+				// Encode: the compact reference form.
+				toRef: (node) => ({ kind: 'hotspot', mapRef: node.mapId }),
+				// Decode: rehydrate (may be async); return the node unchanged when it is not yours.
+				fromRef: async (node) => {
+					if (node.kind !== 'hotspot' || typeof node.mapRef !== 'string') return node;
+					const map = await library.load(node.mapRef);
+					return { ...node, ...map };
+				}
+			})
+		]
+	});
+```
+
+`match` only gates encode; on decode `fromRef` is handed every record node, so it must self-guard and return the node untouched when the reference is not one it owns. Re-walking an already-hydrated node is expected to be idempotent.
+
 ### URL Helpers
 
 Every codec and engine can read and write tokens directly on a URL, so you don't have to wire up `URLSearchParams` yourself. Tokens go into a query parameter (default name `data`) or into the hash fragment.
@@ -301,6 +388,7 @@ To see it in action, download the source code and run `npm run example`, or simp
 * `JsonUrl.createWebShareEngine()` is a preset for `raw/gz/df/zl/br/lz` with `version: "1"` and `maxLength: 12000`.
 * `JsonUrl.cleanEncodedInput()` removes percent-encoding and ignorable whitespace before decode.
 * `JsonUrl.createKeyMapTransform()` reversibly shortens well-known object keys before compression.
+* `JsonUrl.createDefaultsTransform()` reversibly strips keys equal to a configured default (and prunes empty containers); `JsonUrl.createResolverReferenceTransform()` compacts embedded objects to references and rehydrates them from a custom (async) resolver on decode.
 * Codecs and engines expose `compressToUrl()` / `decompressFromUrl()` / `tryDecompressFromUrl()` for reading and writing tokens directly on URLs.
 
 ## Package Layout
