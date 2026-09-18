@@ -1,17 +1,3 @@
-declare module 'urlsafe-base64' {
-	export function encode(input: Uint8Array | string): string;
-	export function decode(input: string): Uint8Array;
-	export function validate(input: string): boolean;
-
-	const urlsafeBase64: {
-		encode: typeof encode;
-		decode: typeof decode;
-		validate: typeof validate;
-	};
-
-	export default urlsafeBase64;
-}
-
 declare module 'node-lzw' {
 	export function encode(input: string): Uint8Array | number[];
 	export function decode(input: Uint8Array | number[]): string;

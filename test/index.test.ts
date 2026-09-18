@@ -1,6 +1,6 @@
 import { Buffer } from 'buffer';
 import { describe, expect, it } from 'vitest';
-import { validate } from 'urlsafe-base64';
+import { validate } from '../src/main/safe64.js';
 
 import createClient from '../src/main/index.js';
 import { cleanEncodedInput } from '../src/main/decode-utils.js';

@@ -1,17 +1,16 @@
 import type createMsgPack from 'msgpack5';
 import type { MsgPackInstance } from 'msgpack5';
-import type urlsafeBase64 from 'urlsafe-base64';
 
 import { resolveDefaultExport } from './resolve-default-export.js';
+import safe64 from './safe64.js';
 
 interface CoreLoaderMap {
 	msgpack(): Promise<MsgPackInstance>;
-	safe64(): Promise<typeof urlsafeBase64>;
+	safe64(): Promise<typeof safe64>;
 	zlib(): Promise<typeof import('node:zlib') | null>;
 }
 
 let msgpackPromise: Promise<MsgPackInstance> | null = null;
-let safe64Promise: Promise<typeof urlsafeBase64> | null = null;
 let zlibPromise: Promise<typeof import('node:zlib') | null> | null = null;
 
 const CORE_LOADERS: CoreLoaderMap = {
@@ -22,11 +21,10 @@ const CORE_LOADERS: CoreLoaderMap = {
 		});
 		return msgpackPromise;
 	},
+	// Kept async so callers do not change, but there is nothing to load any more: base64url is a
+	// few lines, and the package that used to provide it could not run in a browser.
 	safe64() {
-		safe64Promise ??= import('urlsafe-base64').then((module) =>
-			resolveDefaultExport<typeof urlsafeBase64>(module)
-		);
-		return safe64Promise;
+		return Promise.resolve(safe64);
 	},
 	zlib() {
 		zlibPromise ??= (async () => {
